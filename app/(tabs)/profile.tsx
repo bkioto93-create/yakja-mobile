@@ -1,0 +1,516 @@
+// مسیر فایل: app/(tabs)/profile.tsx — معادل /profile وب — فاز M01، تسک ۱۰ (نسخه‌ی واقعی)
+//
+// دو حالت اصلی، دقیقاً هم‌رفتار با صفحه‌ی وب (که خودش هم بر اساس getCurrentUser() یکی از این دو
+// حالت را رندر می‌کند):
+//   ۱. کاربر مهمان (user === null، بعد از isReady شدن AuthContext): کارت دعوت‌به‌ورود
+//      (dict.profile.guestTitle/guestDesc/loginButton) → می‌رود به app/auth/login.tsx.
+//   ۲. کاربر واردشده: شماره‌موبایل (+نشان مدیر در صورت role==='admin') + سوییچ زبان + خروج.
+// طبق تسک ۱۱ («کاربر مهمان می‌تواند آزادانه در هر ۴ ماژول بگردد»)، ورود هرگز برای *دیدن* همین
+// صفحه اجباری نیست — فقط دکمه‌های خاص (خروج) برای کاربر مهمان اصلاً رندر نمی‌شوند.
+//
+// سوییچ زبان مستقیم همین‌جا (نه با push به app/select-language.tsx) پیاده شد — چون دیکشنری
+// (dict.profile.languageTitle/Desc/languageFa/languagePs) دقیقاً برای یک سوییچر درون‌خطی طراحی
+// شده (برخلاف select-language.tsx که تمام‌صفحه و بدون‌دیکشنری است، مخصوص اولین‌اجرا). با هر
+// تغییر، هم LanguageContext محلی فوراً و بدون شبکه به‌روز می‌شود، هم — طبق رفتار مستندشده‌ی
+// PATCH /api/mobile/v1/profile (بخش الف، تسک ۴) — یک تماس پس‌زمینه‌ی fire-and-forget برای
+// هم‌گام‌سازی ستون users.language ارسال می‌شود؛ آن Route صراحتاً برای کاربر مهمان هم بدون خطا
+// (فقط بدون ذخیره) موفق برمی‌گردد، پس این تماس هرگز به شرط لاگین‌بودن نیاز ندارد.
+//
+// طبق تصمیم مستندشده‌ی بند ۱.۲ سند راهبردی موبایل («پنل مدیریت خارج از محدوده‌ی این فاز؛ مدیریت
+// همچنان از مرورگر انجام می‌شود»)، کلید دیکشنریِ dict.profile.adminPanelLink عمداً اینجا استفاده
+// نشده — فقط نشان «مدیر سیستم» (dict.profile.roleAdmin) بدون هیچ لینکی نمایش داده می‌شود.
+import { AddStorySection } from '@/components/AddStorySection';
+import { AdminSupportChatEntry } from '@/components/chat/AdminSupportChatEntry';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Icons } from '@/components/ui/Icons';
+import { Spinner } from '@/components/ui/Spinner';
+import { useToast } from '@/components/ui/Toast';
+import { VipBadge } from '@/components/vip/VipBadge';
+import { Colors, Fonts, Radii, Spacing } from '@/constants/theme';
+import { useAppVersion } from '@/context/AppVersionContext';
+import { useAuth } from '@/context/AuthContext';
+import { Language, useLanguage } from '@/context/LanguageContext';
+import { useDictionary } from '@/hooks/useDictionary';
+import { apiFetch } from '@/lib/session';
+import { isUserVip } from '@/lib/vip/vipStatus';
+import { useRouter } from 'expo-router';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+
+// 🛠️ رفعِ باگ (بازخوردِ کارفرما — «شماره‌ی تماس برعکس نوشته می‌شه»): استایلِ writingDirection:
+// 'ltr' که قبلاً روی این متن‌ها بود، به‌تنهایی روی اندروید کافی نبود. علتِ ریشه‌ای این است:
+// «+93 78 663 3322» چند گروهِ عددی با فاصله است؛ خودِ ارقام همیشه چپ‌به‌راست خوانده می‌شوند،
+// ولی وقتی این متن داخلِ یک پاراگرافِ کلاً راست‌به‌چپ قرار می‌گیرد، الگوریتمِ استانداردِ
+// دوجهته‌نویسیِ یونیکد (Bidi Algorithm) *ترتیبِ خودِ گروه‌ها* را برعکس می‌کند — یعنی هر گروه
+// داخلی درست می‌ماند، ولی گروه‌ها کنارِ هم برعکس چیده می‌شوند؛ دقیقاً همان چیزی که «برعکس نوشته
+// می‌شه» توصیف شد. راه‌حلِ قابل‌اعتماد (نه فقط یک استایل که پشتیبانی‌اش ناقص است): پیچیدنِ متن
+// در نویسه‌های ایزوله‌سازیِ جهتِ رسمیِ یونیکد (LRI…PDI) — این به الگوریتمِ Bidi صریحاً می‌گوید
+// «هرچه داخلِ این محدوده است، قطعاً و بدون‌قید‌وشرط چپ‌به‌راست است»، فارغ از این‌که خودِ
+// پلتفرم چه پشتیبانیِ استایلی داشته باشد.
+function forceLtr(text: string): string {
+  return `\u2066${text}\u2069`;
+}
+
+export default function ProfileScreen() {
+  const dict = useDictionary();
+  const { language, setLanguage } = useLanguage();
+  const { user, isReady, logout } = useAuth();
+  const { showToast } = useToast();
+  const router = useRouter();
+  // 🆕 سیستمِ کنترلِ نسخه‌ی اپ — همان state سراسری که app/_layout.tsx برای مودال/صفحه‌ی
+  // مسدودکننده استفاده می‌کند؛ اینجا فقط برای نمایشِ وضعیت خوانده می‌شود (بدونِ در نظر گرفتنِ
+  // این‌که کاربر مودالِ نرم را قبلاً رد کرده یا نه — طبق درخواستِ صریحِ کارفرما، این بخش همیشه
+  // باید وضعیتِ واقعی را نشان بدهد، فارغ از این‌که پاپ‌آپ را دیده/ردکرده یا نه).
+  const { status: appVersionStatus, currentVersion, downloadUrl } = useAppVersion();
+
+  const changeLanguage = (lang: Language) => {
+    if (lang === language) return;
+    setLanguage(lang);
+    // پس‌زمینه، بدون انتظار — خطای احتمالی شبکه نباید UI سوییچ زبان (که محلی و فوری است) را
+    // مسدود کند. اگر این تماس شکست بخورد، ستون دیتابیس فقط تا تماس موفق بعدی هم‌گام نمی‌شود؛
+    // تجربه‌ی خودِ اپ (که از LanguageContext محلی می‌خواند) بدون تغییر و فوری باقی می‌ماند.
+    apiFetch('/api/mobile/v1/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ language: lang }),
+    }).catch(() => {});
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    showToast(dict.common.success, 'success');
+  };
+
+  if (!isReady) {
+    return (
+      <View style={styles.centered}>
+        <Spinner size="large" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.pageTitle}>{dict.profile.title}</Text>
+
+      {user ? (
+        <Card style={styles.card}>
+          <Text style={styles.cardLabel}>{dict.profile.phoneLabel}</Text>
+          <View style={styles.identityRow}>
+            <Text style={styles.phoneValue}>{user.phoneNumber}</Text>
+            {/* **افزوده‌شده (قابلیت VIP):** تیکِ VIP کنارِ شماره، دقیقاً هم‌جا با وب. */}
+            {isUserVip(user.vipExpiresAt) && <VipBadge label={dict.vip.badgeLabel} />}
+          </View>
+          {user.role === 'admin' && (
+            <View style={styles.adminBadge}>
+              <Text style={styles.adminBadgeText}>{dict.profile.roleAdmin}</Text>
+            </View>
+          )}
+        </Card>
+      ) : (
+        <Card style={styles.card}>
+          <Text style={styles.guestTitle}>{dict.profile.guestTitle}</Text>
+          <Text style={styles.cardDesc}>{dict.profile.guestDesc}</Text>
+          <Button
+            title={dict.profile.loginButton}
+            onPress={() => router.push('/auth/login')}
+            style={styles.loginButton}
+          />
+        </Card>
+      )}
+
+      {/* **افزوده‌شده (قابلیت VIP):** برای کاربرِ VIP نیست، یک کارتِ ترغیب‌کننده به صفحه‌ی
+          خرید؛ برای کاربرِ VIP، اینجا چیزی تکراری نشان داده نمی‌شود (وضعیتش همین بالا، کنار
+          شماره، مشخص است). مهمان اصلاً این کارت را نمی‌بیند — عضویتِ VIP نیازمندِ ورود است. */}
+      {user && !isUserVip(user.vipExpiresAt) && (
+        <Card style={styles.vipUpsellCard}>
+          <View style={styles.vipUpsellIconWrap}>
+            <Icons.CheckCircle size={20} color="#fff" />
+          </View>
+          <View style={styles.vipUpsellTextCol}>
+            <Text style={styles.vipUpsellTitle}>{dict.vip.profileUpsellTitle}</Text>
+            <Text style={styles.vipUpsellDesc}>{dict.vip.profileUpsellDesc}</Text>
+          </View>
+          <Button
+            title={dict.vip.upsell.button}
+            onPress={() => router.push('/vip')}
+            style={styles.vipUpsellButton}
+          />
+        </Card>
+      )}
+
+      {/* **افزوده‌شده (قابلیت استوری — بخش نوشتن):** معادلِ موبایلِ AddStorySection وب. فقط
+          برای کاربرِ واردشده — دقیقاً هم‌رفتار با کارتِ هویتِ بالا. */}
+      {user && <AddStorySection />}
+
+      {/* **افزوده‌شده (قابلیت چت):** لینکِ ورود به فهرستِ گفتگوها — فقط برای کاربرِ واردشده،
+          دقیقاً هم‌رفتار با بقیه‌ی کارت‌های این صفحه. */}
+      {user && (
+        <Pressable onPress={() => router.push('/chat')} style={({ pressed }) => pressed && styles.pressed}>
+          <Card style={styles.chatLinkCard}>
+            <View style={styles.chatLinkIconWrap}>
+              <Icons.MessageSquare size={18} color={Colors.primary} />
+            </View>
+            <Text style={styles.chatLinkText}>{dict.chat.myChatsLink}</Text>
+            <Icons.ChevronBack size={18} color={Colors.textMuted} />
+          </Card>
+        </Pressable>
+      )}
+
+      {/* **افزوده‌شده (چت با پشتیبانی):** برخلاف بقیه‌ی کارت‌های این صفحه، برای کاربرِ مهمان هم
+          نمایش داده می‌شود — خودِ کامپوننت او را به صفحه‌ی ورود می‌برد، دقیقاً هم‌رفتار با وب. */}
+      <AdminSupportChatEntry
+        viewerId={user?.id ?? null}
+        variant="card"
+        dict={dict.chat.adminSupport}
+      />
+
+      <Card style={styles.card}>
+        <Text style={styles.cardLabel}>{dict.profile.languageTitle}</Text>
+        <Text style={styles.cardDesc}>{dict.profile.languageDesc}</Text>
+        <View style={styles.languageRow}>
+          <Button
+            title={dict.profile.languageFa}
+            variant={language === 'fa' ? 'primary' : 'secondary'}
+            onPress={() => changeLanguage('fa')}
+            style={styles.languageChip}
+          />
+          <Button
+            title={dict.profile.languagePs}
+            variant={language === 'ps' ? 'primary' : 'secondary'}
+            onPress={() => changeLanguage('ps')}
+            style={styles.languageChip}
+          />
+        </View>
+      </Card>
+
+      {user && (
+        <Button
+          title={dict.profile.logout}
+          variant="secondary"
+          onPress={handleLogout}
+          style={styles.logoutButton}
+        />
+      )}
+
+      {/* 🆕 سیستمِ کنترلِ نسخه‌ی اپ — بخشِ «نسخه‌ی برنامه»: طبق درخواستِ صریحِ کارفرما، برای هم
+          کاربرِ مهمان هم واردشده نمایش داده می‌شود (بیرونِ هر شرطِ user &&)، چون این اطلاعات
+          سراسری/اپ‌محور است، نه کاربرمحور. همیشه وضعیتِ واقعی نشان می‌دهد، حتی اگر پاپ‌آپِ نرم
+          قبلاً رد شده باشد — جزئیاتِ کامل در یادداشتِ بالای useAppVersion() بالای فایل. */}
+      <Card style={styles.versionCard}>
+        <View style={styles.versionCardHeader}>
+          <View style={styles.versionIconWrap}>
+            <Icons.Download size={18} color={Colors.primary} />
+          </View>
+          <View style={styles.versionCardTextCol}>
+            <Text style={styles.versionCardTitle}>{dict.appUpdate.profileSectionTitle}</Text>
+            <Text style={styles.versionCardCurrent}>
+              {dict.appUpdate.currentVersionLabel}: {currentVersion}
+            </Text>
+          </View>
+        </View>
+
+        {appVersionStatus === 'updateAvailable' || appVersionStatus === 'updateRequired' ? (
+          <>
+            <Text style={styles.versionStatusOutdated}>{dict.appUpdate.outdatedStatus}</Text>
+            <Button
+              title={dict.appUpdate.outdatedButton}
+              variant="secondary"
+              onPress={() => Linking.openURL(downloadUrl)}
+            />
+          </>
+        ) : appVersionStatus === 'upToDate' ? (
+          <View style={styles.versionStatusRow}>
+            <Icons.CheckCircle size={16} color={Colors.success} />
+            <Text style={styles.versionStatusUpToDate}>{dict.appUpdate.upToDateStatus}</Text>
+          </View>
+        ) : null}
+      </Card>
+
+      {/* 🆕 اطلاعاتِ تماس — معادلِ موبایلیِ بخشِ تماسِ فوترِ وب (src/components/Footer.tsx):
+          طبق درخواستِ صریحِ کارفرما («اپ فوتر نمی‌خواد، ولی یه سری اطلاعات قطعاً باید باشه، مثل
+          شماره تماس»)، به‌جای یک فوترِ کامل (که برای اپ موبایل معنا ندارد — کاربر اسکرول‌کردن تا
+          «ته صفحه» را برای دیدنِ اطلاعاتِ تماس عادت ندارد)، همین اطلاعات به‌صورتِ یک کارتِ
+          مستقل و همیشه در دسترس در تبِ پروفایل آمد — دقیقاً همان دیکشنری‌ای که وب هم استفاده
+          می‌کند (dict.contact)، پس نیازی به هیچ متنِ تازه‌ای نبود. برای هر کاربری (مهمان یا
+          واردشده) نمایش داده می‌شود، بیرون از هر شرطِ user &&، چون این اطلاعات کاملاً اپ‌محور
+          است، نه کاربرمحور — دقیقاً هم‌الگو با کارتِ نسخه‌ی برنامه‌ی بالا. شماره‌تماس و
+          وب‌سایت هم لمس‌پذیرند (باز کردنِ اپِ تماس/مرورگر)، آدرس فقط نمایشی است (چیزی برای باز
+          کردن ندارد). */}
+      <Card style={styles.contactCard}>
+        <Text style={styles.contactCardTitle}>{dict.contact.title}</Text>
+
+        <Pressable
+          onPress={() => Linking.openURL(`tel:${dict.contact.phoneVal.replace(/\s/g, '')}`)}
+          style={({ pressed }) => [styles.contactRow, pressed && styles.contactRowPressed]}>
+          <View style={styles.contactIconWrap}>
+            <Icons.Phone size={16} color={Colors.primary} />
+          </View>
+          <View style={styles.contactTextCol}>
+            <Text style={styles.contactLabel}>{dict.contact.phoneLabel}</Text>
+            <Text style={[styles.contactValue, styles.ltrText]}>
+              {forceLtr(dict.contact.phoneVal)}
+            </Text>
+          </View>
+        </Pressable>
+
+        <View style={styles.contactRow}>
+          <View style={styles.contactIconWrap}>
+            <Icons.MapPin size={16} color={Colors.primary} />
+          </View>
+          <View style={styles.contactTextCol}>
+            <Text style={styles.contactLabel}>{dict.contact.addressLabel}</Text>
+            <Text style={styles.contactValue}>{dict.contact.addressVal}</Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={() => Linking.openURL(`https://${dict.contact.domainVal}`)}
+          style={({ pressed }) => [styles.contactRow, pressed && styles.contactRowPressed]}>
+          <View style={styles.contactIconWrap}>
+            <Icons.Globe size={16} color={Colors.primary} />
+          </View>
+          <View style={styles.contactTextCol}>
+            <Text style={styles.contactLabel}>{dict.contact.domainLabel}</Text>
+            <Text style={[styles.contactValue, styles.ltrText]}>
+              {forceLtr(dict.contact.domainVal)}
+            </Text>
+          </View>
+        </Pressable>
+      </Card>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.bgBase,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.bgBase,
+  },
+  content: {
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  pageTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+    marginBottom: Spacing.xs,
+  },
+  card: {
+    gap: Spacing.sm,
+  },
+  cardLabel: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+    color: Colors.textMuted,
+  },
+  cardDesc: {
+    fontSize: 14,
+    fontFamily: Fonts.regular,
+    color: Colors.textMuted,
+    lineHeight: 21,
+  },
+  phoneValue: {
+    fontSize: 18,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+  },
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  pressed: {
+    opacity: 0.8,
+  },
+  chatLinkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  chatLinkIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radii.md,
+    backgroundColor: 'rgba(6,182,212,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatLinkText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+  },
+  // --- کارتِ ترغیب به VIP (فقط برای کاربرِ غیرِ VIP) ---
+  vipUpsellCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  vipUpsellIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: Radii.md,
+    backgroundColor: '#f59e0b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vipUpsellTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  vipUpsellTitle: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+    color: '#92400e',
+  },
+  vipUpsellDesc: {
+    fontSize: 11,
+    fontFamily: Fonts.regular,
+    color: '#b45309',
+    marginTop: 1,
+  },
+  vipUpsellButton: {
+    minHeight: 38,
+    paddingHorizontal: Spacing.md,
+  },
+  guestTitle: {
+    fontSize: 16,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+  },
+  loginButton: {
+    marginTop: Spacing.xs,
+  },
+  adminBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.accent,
+    borderRadius: Radii.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    marginTop: Spacing.xs,
+  },
+  adminBadgeText: {
+    fontSize: 12,
+    fontFamily: Fonts.bold,
+    color: Colors.white,
+  },
+  languageRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  languageChip: {
+    flex: 1,
+  },
+  logoutButton: {
+    marginTop: Spacing.sm,
+  },
+  // 🆕 سیستمِ کنترلِ نسخه‌ی اپ — بخشِ «نسخه‌ی برنامه».
+  versionCard: {
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  versionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  versionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radii.md,
+    backgroundColor: 'rgba(6,182,212,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  versionCardTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  versionCardTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+  },
+  versionCardCurrent: {
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  versionStatusOutdated: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+    color: Colors.accent,
+  },
+  versionStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  versionStatusUpToDate: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+    color: Colors.success,
+  },
+  // 🆕 اطلاعاتِ تماس — معادلِ موبایلیِ بخشِ تماسِ فوترِ وب.
+  contactCard: {
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  contactCardTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+    marginBottom: Spacing.xs,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radii.md,
+  },
+  contactRowPressed: {
+    backgroundColor: Colors.bgBase,
+  },
+  contactIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: Radii.md,
+    backgroundColor: 'rgba(6,182,212,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  contactLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.regular,
+    color: Colors.textMuted,
+  },
+  contactValue: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+    marginTop: 1,
+  },
+  // اعداد/دامنه‌های لاتین همیشه چپ‌به‌راست بمانند، حتی داخلِ چیدمانِ کلیِ راست‌به‌چپِ اپ —
+  // معادلِ RN برای dir="ltr" وب (که خودِ Text در React Native پشتیبانی نمی‌کند).
+  ltrText: {
+    writingDirection: 'ltr',
+  },
+});

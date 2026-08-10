@@ -12,14 +12,21 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.yakja.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "versionCode": 5
     },
     "web": {
       "output": "static",
@@ -38,11 +45,59 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "برای انتخاب عکس آگهی به دسترسی گالری نیاز است.",
+          "cameraPermission": "برای گرفتن عکس آگهی به دسترسی دوربین نیاز است."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "برای نمایش آگهی‌های نزدیک به شما و ثبت موقعیت آگهی، به موقعیت مکانی نیاز است."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "enableMinifyInReleaseBuilds": false
+          }
+        }
+      ],
+      "expo-video",
+      "expo-navigation-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "برای ضبط پیام صوتی در چت به دسترسی میکروفون نیاز است."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-foreground.png",
+          "color": "#06b6d4"
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2aa7db24-d55e-4d83-b9fd-ee5cc686debf"
+      }
+    },
+    "owner": "hamrah-havaleh-dev"
   }
 }

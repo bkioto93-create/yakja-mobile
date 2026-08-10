@@ -41,3 +41,7 @@ app-example
 # generated native folders
 /ios
 /android
+.env
+generate_mobile_snapshot.py
+run_mobile_snapshot.bat
+yakja_mobile_snapshot.txt

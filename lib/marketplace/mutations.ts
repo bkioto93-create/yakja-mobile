@@ -35,6 +35,8 @@ import type { ListingCategoryId } from './categories';
 import { getListingImageUrls } from './images';
 
 const LISTINGS_BUCKET = 'listings-images';
+// 🆕 فاز M09
+const LISTINGS_VIDEOS_BUCKET = 'listings-videos';
 
 /** خطای برگشتی از هر سه Route؛ code دقیقاً یکی از کلیدهای dict.marketplace.wizard.errors است. */
 export class MarketplaceApiError extends Error {
@@ -88,6 +90,37 @@ export async function uploadListingImages(localUris: string[]): Promise<string[]
   return imagePaths;
 }
 
+/**
+ * 🆕 فاز M09 — همگام‌سازی با وب، آپلودِ ویدئوی کوتاهِ VIP. دقیقاً هم‌الگو با uploadListingImages
+ * بالا، با دو تفاوت: (۱) بدون فشرده‌سازی (رجوع کنید به یادداشتِ کاملِ lib/media/videoUpload.ts —
+ * موتورِ فشرده‌سازیِ وب مخصوصِ Canvas/MediaRecorderِ مرورگر است و در React Native وجود ندارد)،
+ * (۲) Route جداگانه‌ی video-upload-slot به‌جای upload-slots (چون این یکی mimeType هم می‌پذیرد —
+ * رجوع کنید به یادداشتِ کاملِ همان فایل در پوشه‌ی web-repo-routes/).
+ */
+/** 🆕 فاز M09 — پاسخِ Route ویدئو، یک اسلاتِ تکی (نه آرایه‌ی upload-slots عکس‌ها). */
+type VideoUploadSlotResponse =
+  | { success: true; slot: { path: string; token: string } }
+  | { success: false; error: string };
+
+export async function uploadListingVideo(localUri: string): Promise<string> {
+  const slotRes = await apiFetch('/api/mobile/v1/marketplace/video-upload-slot', {
+    method: 'POST',
+    body: JSON.stringify({ mimeType: 'video/mp4' }),
+  });
+  const slotData: VideoUploadSlotResponse = await slotRes.json();
+  if (!slotData.success) throw new MarketplaceApiError(slotData.error);
+
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+
+  const { error } = await supabase.storage
+    .from(LISTINGS_VIDEOS_BUCKET)
+    .uploadToSignedUrl(slotData.slot.path, slotData.slot.token, blob, { contentType: 'video/mp4' });
+  if (error) throw new MarketplaceApiError('uploadFailed');
+
+  return slotData.slot.path;
+}
+
 export type CreateListingPayload = {
   category: ListingCategoryId;
   // فاز ۱۰ موبایل — قابلیت «ولایت»: فیلد الزامی تازه — createListingAction وب (که این Route پل
@@ -104,6 +137,9 @@ export type CreateListingPayload = {
    *  imagePaths باشد تا با قرارداد واقعی Route وب (src/app/[lang]/listings/new/actions.ts ::
    *  createListingAction) یکی باشد. */
   imagePaths: string[];
+  /** 🆕 فاز M09 — مسیرِ خامِ Storage یا null؛ اختیاری، فقط برای کاربرِ VIP (سرور دوباره خودش
+   *  هم این را بررسی می‌کند، نه فقط UI). */
+  videoPath?: string | null;
   latitude?: number | null;
   longitude?: number | null;
 };

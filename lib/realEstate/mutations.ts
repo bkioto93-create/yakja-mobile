@@ -21,6 +21,8 @@ import type { DealTypeId } from './dealTypes';
 import type { PropertyTypeId } from './propertyTypes';
 
 const REAL_ESTATE_BUCKET = 'real-estate-images';
+// 🆕 فاز M09
+const REAL_ESTATE_VIDEOS_BUCKET = 'real-estate-videos';
 
 /** خطای برگشتی از هر دو Route؛ code دقیقاً یکی از کلیدهای dict.realEstate.wizard.errors است. */
 export class RealEstateApiError extends Error {
@@ -70,6 +72,34 @@ export async function uploadRealEstateImages(localUris: string[]): Promise<strin
   return imagePaths;
 }
 
+/** 🆕 فاز M09 — پاسخِ Route ویدئو، یک اسلاتِ تکی (نه آرایه‌ی upload-slots عکس‌ها). */
+type VideoUploadSlotResponse =
+  | { success: true; slot: { path: string; token: string } }
+  | { success: false; error: string };
+
+/**
+ * 🆕 فاز M09 — همگام‌سازی با وب، آپلودِ ویدئوی کوتاهِ VIP. دقیقاً هم‌الگو با
+ * uploadProviderVideo (lib/services/providerProfile.ts) — بدونِ فشرده‌سازی (رجوع کنید به
+ * یادداشتِ کاملِ lib/media/videoUpload.ts)، Route تکی و بدونِ بدنه.
+ */
+export async function uploadRealEstateVideo(localUri: string): Promise<string> {
+  const slotRes = await apiFetch('/api/mobile/v1/real-estate/video-upload-slot', {
+    method: 'POST',
+  });
+  const slotData: VideoUploadSlotResponse = await slotRes.json();
+  if (!slotData.success) throw new RealEstateApiError(slotData.error);
+
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+
+  const { error } = await supabase.storage
+    .from(REAL_ESTATE_VIDEOS_BUCKET)
+    .uploadToSignedUrl(slotData.slot.path, slotData.slot.token, blob, { contentType: 'video/mp4' });
+  if (error) throw new RealEstateApiError('uploadFailed');
+
+  return slotData.slot.path;
+}
+
 export type CreateRealEstateListingPayload = {
   propertyType: PropertyTypeId;
   dealType: DealTypeId;
@@ -84,6 +114,8 @@ export type CreateRealEstateListingPayload = {
   description: string;
   /** مسیرهای خامِ Storage (خروجی uploadRealEstateImages) — نه URL کامل. */
   imagePaths: string[];
+  /** 🆕 فاز M09 — مسیرِ خامِ Storage یا null؛ اختیاری، فقط برای کاربرِ VIP. */
+  videoPath?: string | null;
   latitude?: number | null;
   longitude?: number | null;
 };

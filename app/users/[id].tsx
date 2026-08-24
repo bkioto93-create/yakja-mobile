@@ -17,14 +17,19 @@
 // createReportAction هم‌اکنون خودش با خطای cannotReportSelf این حالت را رد می‌کند؛ این فقط یک
 // بهبود تجربه‌ی کاربری هم‌راستا است).
 import { ReportButton } from '@/components/ReportButton';
+import { FollowButton } from '@/components/follows/FollowButton';
+import { FollowStats } from '@/components/follows/FollowStats';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icons } from '@/components/ui/Icons';
 import { Spinner } from '@/components/ui/Spinner';
+import { VipBadge } from '@/components/vip/VipBadge';
 import { Colors, Fonts, Radii, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useDictionary } from '@/hooks/useDictionary';
+import { FollowState, getFollowState } from '@/lib/follows/api';
 import { getPublicUserProfile, PublicUserProfile } from '@/lib/users/publicProfile';
+import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -37,6 +42,9 @@ export default function PublicUserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [profile, setProfile] = useState<PublicUserProfile | null | undefined>(undefined); // undefined = در حال بارگذاری
+  // 🆕 فاز M09 — وضعیتِ فالو، جدا از profile چون یک منبعِ داده‌ی مستقل است (Route جداگانه)؛
+  // undefined یعنی هنوز نرسیده (کارتِ فالو تا رسیدنش چیزی رندر نمی‌کند، نه یک اسکلتِ خالی).
+  const [followState, setFollowState] = useState<FollowState | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +57,12 @@ export default function PublicUserProfileScreen() {
       .catch(() => {
         if (!cancelled) setProfile(null);
       });
+
+    getFollowState(id)
+      .then((result) => {
+        if (!cancelled) setFollowState(result);
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
@@ -94,17 +108,63 @@ export default function PublicUserProfileScreen() {
       <View style={styles.container}>
         <Card style={styles.identityCard}>
           <View style={styles.avatarWrap}>
-            <Icons.User size={28} color={Colors.primary} />
+            {/* 🆕 فاز M09 — عکسِ پروفایلِ تاییدشده (اگر باشد)، دقیقاً هم‌قاعده‌ی وب: profile.photoUrl
+                از سرور از قبل فقط برای وضعیتِ approved مقدار می‌گیرد، پس اینجا نیازی به بررسیِ
+                دوباره‌ی وضعیت نیست. */}
+            {profile.photoUrl ? (
+              <Image source={{ uri: profile.photoUrl }} style={styles.avatarImage} contentFit="cover" />
+            ) : (
+              <Icons.User size={28} color={Colors.primary} />
+            )}
           </View>
           <View style={styles.identityInfo}>
-            <Text style={styles.name} numberOfLines={1}>
-              {displayName}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {/* 🆕 فاز M09 — تیکِ VIP کنارِ نام، دقیقاً هم‌جا با وب. */}
+              {profile.isVip && <VipBadge label={dict.vip.badgeLabel} />}
+            </View>
             <Text style={styles.memberSince}>
               {pageDict.memberSinceLabel.replace('{year}', String(profile.memberSinceYear))}
             </Text>
           </View>
         </Card>
+
+        {/* 🆕 فاز M09 — شمارشِ دنبال‌کنندگان/دنبال‌شوندگان + دکمه‌ی فالو، فقط برای کاربرِ دیگر
+            (نه پروفایلِ خودِ بیننده). تا وقتی followState نرسیده، چیزی رندر نمی‌شود — نه یک
+            اسکلتِ خالی. */}
+        {followState && (
+          <View style={styles.followRow}>
+            <FollowStats
+              userId={profile.id}
+              followersCount={followState.followersCount}
+              followingCount={followState.followingCount}
+              followersLabel={dict.follows.followersLabel}
+              followingLabel={dict.follows.followingLabel}
+            />
+            {!isOwnProfile && (
+              <FollowButton
+                targetUserId={profile.id}
+                initialIsFollowing={followState.isFollowing}
+                initialIsFollowedBy={followState.isFollowedBy}
+                dict={dict.follows}
+                onLoginRequired={() => router.push('/auth/login')}
+                onChange={({ isFollowing }) =>
+                  setFollowState((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          isFollowing,
+                          followersCount: Math.max(0, prev.followersCount + (isFollowing ? 1 : -1)),
+                        }
+                      : prev
+                  )
+                }
+              />
+            )}
+          </View>
+        )}
 
         <View style={styles.statsRow}>
           <Card style={styles.statCard}>
@@ -183,10 +243,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecfeff',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  // 🆕 فاز M09
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   identityInfo: {
     flex: 1,
     gap: 2,
+  },
+  // 🆕 فاز M09 — عنوان کنارِ بجِ VIP
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
   },
   name: {
     fontSize: 17,
@@ -197,6 +269,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: Fonts.regular,
     color: Colors.textMuted,
+  },
+  // 🆕 فاز M09 — ردیفِ آمارِ فالو + دکمه، زیرِ کارتِ هویت
+  followRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
   statsRow: {
     flexDirection: 'row',

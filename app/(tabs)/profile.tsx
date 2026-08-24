@@ -21,6 +21,8 @@
 // نشده — فقط نشان «مدیر سیستم» (dict.profile.roleAdmin) بدون هیچ لینکی نمایش داده می‌شود.
 import { AddStorySection } from '@/components/AddStorySection';
 import { AdminSupportChatEntry } from '@/components/chat/AdminSupportChatEntry';
+import { FollowStats } from '@/components/follows/FollowStats';
+import { ProfilePhotoUploader } from '@/components/ProfilePhotoUploader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icons } from '@/components/ui/Icons';
@@ -32,9 +34,14 @@ import { useAppVersion } from '@/context/AppVersionContext';
 import { useAuth } from '@/context/AuthContext';
 import { Language, useLanguage } from '@/context/LanguageContext';
 import { useDictionary } from '@/hooks/useDictionary';
+import { ContactInfo, getContactInfo } from '@/lib/contactInfo/api';
+import { FollowState, getFollowState } from '@/lib/follows/api';
 import { apiFetch } from '@/lib/session';
+import { getProfilePhotoUrl } from '@/lib/users/profilePhotoUrl';
 import { isUserVip } from '@/lib/vip/vipStatus';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 // 🛠️ رفعِ باگ (بازخوردِ کارفرما — «شماره‌ی تماس برعکس نوشته می‌شه»): استایلِ writingDirection:
@@ -62,6 +69,45 @@ export default function ProfileScreen() {
   // این‌که کاربر مودالِ نرم را قبلاً رد کرده یا نه — طبق درخواستِ صریحِ کارفرما، این بخش همیشه
   // باید وضعیتِ واقعی را نشان بدهد، فارغ از این‌که پاپ‌آپ را دیده/ردکرده یا نه).
   const { status: appVersionStatus, currentVersion, downloadUrl } = useAppVersion();
+
+  // 🆕 فاز M09 — همگام‌سازی با وب: کارتِ تماس دیگر از دیکشنریِ ایستا نمی‌خواند، بلکه اطلاعاتِ
+  // زنده‌ی پنلِ ادمین («اطلاعاتِ یکجا») را می‌گیرد. مقدارِ اولیه‌ی state مستقیماً همان فال‌بکِ
+  // دیکشنری است (نه null) — یعنی کارت از همان اولین رندر با متنِ درست (فقط شاید قدیمی‌تر) نشان
+  // داده می‌شود، بدون هیچ فلشِ خالی؛ به‌محضِ رسیدنِ پاسخِ واقعی، جایگزین می‌شود.
+  const [contactInfo, setContactInfo] = useState<ContactInfo>({
+    whatsappNumber: '',
+    phoneNumbers: [dict.contact.phoneVal],
+    address: dict.contact.addressVal,
+    extraInfo: '',
+    primaryPhone: dict.contact.phoneVal,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    getContactInfo({ phone: dict.contact.phoneVal, address: dict.contact.addressVal }).then((info) => {
+      if (!cancelled) setContactInfo(info);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 🆕 فاز M09 — همگام‌سازی با وب، سیستم «دنبال‌کردن»: شمارشِ دنبال‌کنندگان/دنبال‌شوندگانِ
+  // خودِ کاربر، فقط برای نمایشِ FollowStats زیرِ کارتِ هویت — بدون هیچ دکمه‌ی فالو (فالوکردنِ
+  // خود بی‌معناست، دقیقاً هم‌قاعده‌ی وب که همان‌جا هم FollowButton را کاملاً حذف می‌کند، نه فقط
+  // غیرفعال). همان Route ترکیبیِ follow-state با شناسه‌ی خودِ کاربر صدا زده می‌شود —
+  // isFollowing/isFollowedBy همیشه false برمی‌گردند (getFollowState وب: «اگر viewerId===targetId
+  // باشد، همیشه false/false»)، که اینجا هم بی‌ضرر و نادیده گرفته می‌شوند.
+  const [ownFollowState, setOwnFollowState] = useState<FollowState | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setOwnFollowState(null);
+      return;
+    }
+    getFollowState(user.id).then(setOwnFollowState).catch(() => {});
+  }, [user]);
 
   const changeLanguage = (lang: Language) => {
     if (lang === language) return;
@@ -94,15 +140,48 @@ export default function ProfileScreen() {
 
       {user ? (
         <Card style={styles.card}>
-          <Text style={styles.cardLabel}>{dict.profile.phoneLabel}</Text>
-          <View style={styles.identityRow}>
-            <Text style={styles.phoneValue}>{user.phoneNumber}</Text>
-            {/* **افزوده‌شده (قابلیت VIP):** تیکِ VIP کنارِ شماره، دقیقاً هم‌جا با وب. */}
-            {isUserVip(user.vipExpiresAt) && <VipBadge label={dict.vip.badgeLabel} />}
+          <View style={styles.identityHeaderRow}>
+            {/* 🆕 فاز M09 — همگام‌سازی با وب: آواتارِ کوچکِ کارتِ هویت، دقیقاً هم‌الگو با
+                UserStoryAvatar وب: فقط عکسِ *تاییدشده* نشان داده می‌شود (همان چیزی که بازدیدکننده‌ی
+                دیگری هم می‌بیند)؛ عکسِ در-انتظار/ردشده فقط داخلِ کارتِ ProfilePhotoUploader پایین
+                (که برای مدیریتِ خودِ کاربر است) دیده می‌شود. اگر هنوز عکسِ تاییدشده‌ای نیست، همان
+                آیکونِ ساده‌ی قبلی. */}
+            <View style={styles.miniAvatarWrap}>
+              {user.photoStatus === 'approved' && user.photoPath ? (
+                <Image
+                  source={{ uri: getProfilePhotoUrl(user.photoPath) }}
+                  style={styles.miniAvatarImage}
+                  contentFit="cover"
+                />
+              ) : (
+                <Icons.User size={20} color={Colors.primary} />
+              )}
+            </View>
+            <View style={styles.identityTextCol}>
+              <Text style={styles.cardLabel}>{dict.profile.phoneLabel}</Text>
+              <View style={styles.identityRow}>
+                <Text style={styles.phoneValue}>{user.phoneNumber}</Text>
+                {/* **افزوده‌شده (قابلیت VIP):** تیکِ VIP کنارِ شماره، دقیقاً هم‌جا با وب. */}
+                {isUserVip(user.vipExpiresAt) && <VipBadge label={dict.vip.badgeLabel} />}
+              </View>
+              {user.role === 'admin' && (
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>{dict.profile.roleAdmin}</Text>
+                </View>
+              )}
+            </View>
           </View>
-          {user.role === 'admin' && (
-            <View style={styles.adminBadge}>
-              <Text style={styles.adminBadgeText}>{dict.profile.roleAdmin}</Text>
+
+          {/* 🆕 فاز M09 — شمارشِ دنبال‌کنندگان/دنبال‌شوندگانِ خودِ کاربر، بدون دکمه‌ی فالو. */}
+          {ownFollowState && (
+            <View style={styles.followStatsWrap}>
+              <FollowStats
+                userId={user.id}
+                followersCount={ownFollowState.followersCount}
+                followingCount={ownFollowState.followingCount}
+                followersLabel={dict.follows.followersLabel}
+                followingLabel={dict.follows.followingLabel}
+              />
             </View>
           )}
         </Card>
@@ -117,6 +196,10 @@ export default function ProfileScreen() {
           />
         </Card>
       )}
+
+      {/* 🆕 عکسِ پروفایل (فاز M09 — همگام‌سازی با وب) — کارتِ مستقل، فقط برای کاربرِ واردشده؛
+          خودِ کامپوننت اگر user=null باشد چیزی رندر نمی‌کند، پس شرطِ user && اینجا لازم نیست. */}
+      <ProfilePhotoUploader />
 
       {/* **افزوده‌شده (قابلیت VIP):** برای کاربرِ VIP نیست، یک کارتِ ترغیب‌کننده به صفحه‌ی
           خرید؛ برای کاربرِ VIP، اینجا چیزی تکراری نشان داده نمی‌شود (وضعیتش همین بالا، کنار
@@ -226,32 +309,63 @@ export default function ProfileScreen() {
         ) : null}
       </Card>
 
-      {/* 🆕 اطلاعاتِ تماس — معادلِ موبایلیِ بخشِ تماسِ فوترِ وب (src/components/Footer.tsx):
+      {/* 🆕 اطلاعاتِ تماس — معادلِ موبایلیِ بخشِ تماسِ فوترِ وب (src/components/Footer.tsx) +
+          صفحه‌ی «تماس با ما»ی وب (src/app/[lang]/contact/page.tsx):
           طبق درخواستِ صریحِ کارفرما («اپ فوتر نمی‌خواد، ولی یه سری اطلاعات قطعاً باید باشه، مثل
-          شماره تماس»)، به‌جای یک فوترِ کامل (که برای اپ موبایل معنا ندارد — کاربر اسکرول‌کردن تا
-          «ته صفحه» را برای دیدنِ اطلاعاتِ تماس عادت ندارد)، همین اطلاعات به‌صورتِ یک کارتِ
-          مستقل و همیشه در دسترس در تبِ پروفایل آمد — دقیقاً همان دیکشنری‌ای که وب هم استفاده
-          می‌کند (dict.contact)، پس نیازی به هیچ متنِ تازه‌ای نبود. برای هر کاربری (مهمان یا
+          شماره تماس»)، به‌جای یک فوترِ کامل (که برای اپ موبایل معنا ندارد)، همین اطلاعات
+          به‌صورتِ یک کارتِ مستقل و همیشه در دسترس در تبِ پروفایل آمد.
+          🛠️ فاز M09 — همگام‌سازی با وب: قبلاً این کارت مستقیم از دیکشنریِ ایستا می‌خواند؛ حالا
+          دقیقاً هم‌محتوا با صفحه‌ی «تماس با ما»ی وب است — شماره(های) تماسِ چندتایی، کادرِ
+          واتساپ (فقط اگر ادمین پر کرده باشد)، و توضیحاتِ تکمیلی (فقط اگر ادمین پر کرده باشد)،
+          همگی از contactInfo (بالا) که زنده از پنلِ ادمین می‌آید. برای هر کاربری (مهمان یا
           واردشده) نمایش داده می‌شود، بیرون از هر شرطِ user &&، چون این اطلاعات کاملاً اپ‌محور
-          است، نه کاربرمحور — دقیقاً هم‌الگو با کارتِ نسخه‌ی برنامه‌ی بالا. شماره‌تماس و
-          وب‌سایت هم لمس‌پذیرند (باز کردنِ اپِ تماس/مرورگر)، آدرس فقط نمایشی است (چیزی برای باز
-          کردن ندارد). */}
+          است، نه کاربرمحور. */}
       <Card style={styles.contactCard}>
         <Text style={styles.contactCardTitle}>{dict.contact.title}</Text>
+        <View style={styles.contactSectionDivider}>
+          <Text style={styles.contactSectionTitle}>{dict.contact.sectionTitle}</Text>
+          <View style={styles.contactSectionLine} />
+        </View>
 
-        <Pressable
-          onPress={() => Linking.openURL(`tel:${dict.contact.phoneVal.replace(/\s/g, '')}`)}
-          style={({ pressed }) => [styles.contactRow, pressed && styles.contactRowPressed]}>
-          <View style={styles.contactIconWrap}>
-            <Icons.Phone size={16} color={Colors.primary} />
-          </View>
-          <View style={styles.contactTextCol}>
-            <Text style={styles.contactLabel}>{dict.contact.phoneLabel}</Text>
-            <Text style={[styles.contactValue, styles.ltrText]}>
-              {forceLtr(dict.contact.phoneVal)}
-            </Text>
-          </View>
-        </Pressable>
+        {/* شماره(های) تماس — اگر ادمین بیش از یک شماره در پنل ذخیره کرده باشد، هرکدام ردیفِ
+            جدای خودش را می‌گیرد؛ دقیقاً هم‌رفتار با contactInfo.phoneNumbers.map وب. */}
+        {contactInfo.phoneNumbers.map((phoneNumber, index) => (
+          <Pressable
+            key={phoneNumber + index}
+            onPress={() => Linking.openURL(`tel:${phoneNumber.replace(/\s/g, '')}`)}
+            style={({ pressed }) => [styles.contactRow, pressed && styles.contactRowPressed]}>
+            <View style={styles.contactIconWrap}>
+              <Icons.Phone size={16} color={Colors.primary} />
+            </View>
+            <View style={styles.contactTextCol}>
+              <Text style={styles.contactLabel}>
+                {contactInfo.phoneNumbers.length > 1
+                  ? `${dict.contact.phoneLabel} ${index + 1}`
+                  : dict.contact.phoneLabel}
+              </Text>
+              <Text style={[styles.contactValue, styles.ltrText]}>{forceLtr(phoneNumber)}</Text>
+            </View>
+          </Pressable>
+        ))}
+
+        {/* کادرِ واتساپ — فقط اگر ادمین شماره‌ی واتساپ را از پنل «اطلاعاتِ یکجا» پر کرده باشد. */}
+        {!!contactInfo.whatsappNumber && (
+          <Pressable
+            onPress={() =>
+              Linking.openURL(`https://wa.me/${contactInfo.whatsappNumber.replace(/[^0-9]/g, '')}`)
+            }
+            style={({ pressed }) => [styles.contactRow, pressed && styles.contactRowPressed]}>
+            <View style={[styles.contactIconWrap, styles.whatsappIconWrap]}>
+              <Icons.Whatsapp size={16} color={Colors.success} />
+            </View>
+            <View style={styles.contactTextCol}>
+              <Text style={styles.contactLabel}>{dict.contact.whatsappLabel}</Text>
+              <Text style={[styles.contactValue, styles.ltrText]}>
+                {forceLtr(contactInfo.whatsappNumber)}
+              </Text>
+            </View>
+          </Pressable>
+        )}
 
         <View style={styles.contactRow}>
           <View style={styles.contactIconWrap}>
@@ -259,9 +373,26 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.contactTextCol}>
             <Text style={styles.contactLabel}>{dict.contact.addressLabel}</Text>
-            <Text style={styles.contactValue}>{dict.contact.addressVal}</Text>
+            <Text style={[styles.contactValue, styles.contactValueMultiline]}>
+              {contactInfo.address}
+            </Text>
           </View>
         </View>
+
+        {/* توضیحاتِ تکمیلی — فقط اگر ادمین از پنل «اطلاعاتِ یکجا» چیزی برایش نوشته باشد. */}
+        {!!contactInfo.extraInfo && (
+          <View style={styles.contactRow}>
+            <View style={styles.contactIconWrap}>
+              <Icons.InfoCircle size={16} color={Colors.primary} />
+            </View>
+            <View style={styles.contactTextCol}>
+              <Text style={styles.contactLabel}>{dict.contact.extraInfoLabel}</Text>
+              <Text style={[styles.contactValue, styles.contactValueMultiline]}>
+                {contactInfo.extraInfo}
+              </Text>
+            </View>
+          </View>
+        )}
 
         <Pressable
           onPress={() => Linking.openURL(`https://${dict.contact.domainVal}`)}
@@ -325,6 +456,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  // 🆕 فاز M09 — ردیفِ آواتارِ کوچک + متنِ هویت، کنارِ هم؛ جایگزینِ چیدمانِ عمودیِ قبلی که فقط
+  // متن داشت.
+  identityHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  identityTextCol: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  miniAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: Radii.full,
+    backgroundColor: 'rgba(6,182,212,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  miniAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  // 🆕 فاز M09 — فاصله‌ی بالای ردیفِ FollowStats، زیرِ ردیفِ هویت (تلفن/VIP/ادمین) داخلِ همان
+  // کارت؛ این استایل قبلاً در JSX استفاده می‌شد ولی این تعریف جا افتاده بود.
+  followStatsWrap: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
   pressed: {
     opacity: 0.8,
@@ -475,6 +638,24 @@ const styles = StyleSheet.create({
     color: Colors.textMain,
     marginBottom: Spacing.xs,
   },
+  // 🆕 فاز M09 — تیترِ کوچکِ «اطلاعات و تماس یکجا» بالای کادرهای زیرین، معادلِ همان تیترِ
+  // میان‌بخشیِ صفحه‌ی «تماس با ما»ی وب.
+  contactSectionDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  contactSectionTitle: {
+    fontSize: 12,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+  },
+  contactSectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -493,6 +674,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // 🆕 فاز M09 — ته‌رنگِ سبزِ متفاوت برای آیکونِ واتساپ، دقیقاً هم‌الگو با کادرِ واتساپِ وب
+  // (bg-emerald-500/10)، تا از بقیه‌ی ردیف‌های فیروزه‌ای متمایز باشد.
+  whatsappIconWrap: {
+    backgroundColor: 'rgba(34,197,94,0.10)',
+  },
   contactTextCol: {
     flex: 1,
     minWidth: 0,
@@ -507,6 +693,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     color: Colors.textMain,
     marginTop: 1,
+  },
+  // 🆕 فاز M09 — آدرس/توضیحاتِ تکمیلی می‌توانند چندخطی باشند (برخلافِ شماره/دامنه)؛
+  // lineHeight اضافه‌شده برای خوانایی، بدونِ محدودیتِ numberOfLines.
+  contactValueMultiline: {
+    lineHeight: 19,
   },
   // اعداد/دامنه‌های لاتین همیشه چپ‌به‌راست بمانند، حتی داخلِ چیدمانِ کلیِ راست‌به‌چپِ اپ —
   // معادلِ RN برای dir="ltr" وب (که خودِ Text در React Native پشتیبانی نمی‌کند).

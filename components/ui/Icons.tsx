@@ -174,4 +174,30 @@ export const Icons = {
   Download: fromIonicons('cloud-download-outline'),
   // **افزوده‌شده (کارتِ اطلاعاتِ تماس در تبِ پروفایل):** برای ردیفِ وب‌سایتِ رسمی.
   Globe: fromIonicons('globe-outline'),
+
+  // --- افزوده‌شده (فاز M09 — همگام‌سازی با وب: بخش «اسعار» + کارتِ تماسِ پویا) ---
+  // آیکونِ هدرِ بخشِ «اسعار» — معادل مستقیمِ Icons.ChartBar وب (src/components/ui/Icons.tsx).
+  ChartBar: fromIonicons('bar-chart'),
+  // فلشِ روند صعودی/نزولیِ هر ردیفِ نرخ ارز — معادل Icons.TrendUp/TrendDown وب.
+  TrendUp: fromIonicons('trending-up'),
+  TrendDown: fromIonicons('trending-down'),
+  // دکمه‌ی جابه‌جاییِ جهتِ تبدیل در ماشین‌حسابِ ارز — معادل Icons.ArrowsExchange وب. Ionicons
+  // معادلِ دقیقی برای «دو فلشِ مخالفِ‌هم» ندارد؛ نزدیک‌ترین گلیفِ هم‌معنا در MaterialCommunityIcons
+  // انتخاب شد (swap-horizontal) — همان الگویی که این فایل برای مفاهیمِ بدونِ معادلِ دقیق در
+  // Ionicons همیشه دنبال کرده (رجوع کنید به یادداشتِ فنیِ بالای فایل).
+  ArrowsExchange: fromMaterialCommunity('swap-horizontal'),
+  // دکمه‌ی واتساپِ کارتِ تماسِ پویا (تبِ پروفایل) — Ionicons آیکونِ برندِ واتساپ ندارد؛
+  // MaterialCommunityIcons دارد (whatsapp)، دقیقاً هم‌روش با بقیه‌ی این فایل.
+  Whatsapp: fromMaterialCommunity('whatsapp'),
+  // بجِ کوچکِ دوربین روی آواتارِ components/ProfilePhotoUploader.tsx — قابلیتِ «آپلود عکس
+  // پروفایل».
+  Camera: fromIonicons('camera'),
+
+  // --- افزوده‌شده (فاز M09 — سیستم «دنبال‌کردن») ---
+  // زنگوله‌ی components/FollowActivityBell.tsx — معادلِ مستقیمِ Icons.Heart وب. برخلافِ نسخه‌ی
+  // وب (که همیشه توپر است، رجوع کنید به یادداشتِ رفعِ باگِ خودِ آن فایل)، اینجا از دو گلیفِ
+  // heart/heart-outline استفاده می‌شود — Ionicons برخلافِ آیکونِ سفارشیِ وب، هر دو حالت را آماده
+  // دارد، پس نیازی به همان دورزدنِ وب (تغییرِ رنگ به‌جای تغییرِ شکل) نبود.
+  HeartOutline: fromIonicons('heart-outline'),
+  HeartSolid: fromIonicons('heart'),
 } as const;

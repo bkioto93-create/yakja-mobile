@@ -41,14 +41,17 @@ import { LoginRequiredCard } from '@/components/LoginRequiredCard';
 import { ProvinceSelectField } from '@/components/province/ProvinceSelectField';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Icons } from '@/components/ui/Icons';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
+import { VipUpsellNotice } from '@/components/vip/VipUpsellNotice';
 import { Colors, Fonts, Radii, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useDictionary } from '@/hooks/useDictionary';
 import { compressImage } from '@/lib/imageCompression';
+import { pickAndValidateVideo, VideoPickError } from '@/lib/media/videoUpload';
 import { normalizeAfghanPhone } from '@/lib/phone';
 import { getActiveServiceCategories, ServiceCategory } from '@/lib/services/categories';
 import { getBuiltinIconComponent } from '@/lib/services/categoryIcons';
@@ -58,7 +61,9 @@ import {
   saveServiceProviderProfile,
   ServicesApiError,
   uploadProviderImages,
+  uploadProviderVideo,
 } from '@/lib/services/providerProfile';
+import { isUserVip } from '@/lib/vip/vipStatus';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
@@ -101,6 +106,10 @@ export default function ServiceProviderProfileScreen() {
   // عکس‌های تازه‌ی انتخاب‌شده در همین جلسه — URI محلی؛ فقط هنگام ذخیره‌ی فرم آپلود می‌شوند.
   const [newImages, setNewImages] = useState<string[]>([]);
   const [compressingCount, setCompressingCount] = useState(0);
+  // 🆕 فاز M09 — یا «از قبل موجود» (مسیرِ خامِ Storage، حالتِ ویرایش) یا «تازه‌ی همین‌جلسه»
+  // (URI محلی)، دقیقاً هم‌الگو با تفکیکِ existingImages/newImages بالا.
+  const [existingVideoPath, setExistingVideoPath] = useState<string | null>(null);
+  const [newVideoUri, setNewVideoUri] = useState<string | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -136,6 +145,7 @@ export default function ServiceProviderProfileScreen() {
           setContactPhone(profile.contactPhone);
           setDescription(profile.description ?? '');
           setExistingImages(profile.images);
+          setExistingVideoPath(profile.videoPath);
           setIsActive(profile.isActive);
         } else {
           setContactPhone(user.phoneNumber);
@@ -178,6 +188,20 @@ export default function ServiceProviderProfileScreen() {
   }
 
   const categoryLabel = (cat: ServiceCategory) => (language === 'ps' ? cat.namePs : cat.nameFa);
+  // 🆕 فاز M09
+  const isVip = isUserVip(user.vipExpiresAt);
+
+  const pickVideo = async () => {
+    try {
+      const picked = await pickAndValidateVideo();
+      if (!picked) return;
+      setNewVideoUri(picked.uri);
+      setExistingVideoPath(null);
+    } catch (err) {
+      const code = err instanceof VideoPickError ? err.code : 'generic';
+      showToast(errorsDict[code] ?? errorsDict.generic, 'error');
+    }
+  };
 
   const addPhotos = async () => {
     const remaining = MAX_PHOTOS - totalImages;
@@ -234,6 +258,14 @@ export default function ServiceProviderProfileScreen() {
       const uploadedPaths = await uploadProviderImages(newImages);
       const normalizedPhone = normalizeAfghanPhone(contactPhone)!; // validate() همین را تضمین کرده
 
+      // 🆕 فاز M09 — سه حالت: عکس/ویدئوی تازه (آپلود می‌شود)، از قبل موجود (همان مسیر دوباره
+      // فرستاده می‌شود)، یا کاملاً حذف‌شده (null).
+      const videoPath = isVip
+        ? newVideoUri
+          ? await uploadProviderVideo(newVideoUri)
+          : existingVideoPath
+        : null;
+
       await saveServiceProviderProfile({
         serviceCategoryId,
         province,
@@ -241,6 +273,7 @@ export default function ServiceProviderProfileScreen() {
         contactPhone: normalizedPhone,
         description: description.trim(),
         imagePaths: [...existingImages, ...uploadedPaths],
+        videoPath,
       });
 
       showToast(isEditMode ? formDict.saveSuccessUpdate : formDict.saveSuccessCreate, 'success');
@@ -393,6 +426,31 @@ export default function ServiceProviderProfileScreen() {
             onPress={addPhotos}
             style={styles.addPhotoButton}
           />
+        )}
+
+        {/* 🆕 فاز M09 — همگام‌سازی با وب، ویدئوی کوتاهِ VIP */}
+        <View style={styles.videoSectionDivider}>
+          <Text style={styles.sectionTitle}>{formDict.videoSectionTitle}</Text>
+        </View>
+        {!isVip ? (
+          <VipUpsellNotice message={dict.vip.upsell.videoMessage} buttonLabel={dict.vip.upsell.button} />
+        ) : newVideoUri || existingVideoPath ? (
+          <View style={styles.videoPreviewWrap}>
+            <View style={styles.videoPreviewPlaceholder}>
+              <Icons.CheckCircle size={22} color={Colors.primary} />
+            </View>
+            <Pressable
+              onPress={() => {
+                setNewVideoUri(null);
+                setExistingVideoPath(null);
+              }}
+              accessibilityLabel={formDict.removeVideoLabel}
+              style={styles.removeBadge}>
+              <Text style={styles.removeBadgeText}>×</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Button title={formDict.addVideoButton} variant="secondary" onPress={pickVideo} />
         )}
 
         {/* تسک ۵ — وقتی پروفایل پنهان نیست (تازه یا فعال)، همان اعلان قبلیِ «بلافاصله قابل‌مشاهده»
@@ -559,6 +617,26 @@ const styles = StyleSheet.create({
   },
   addPhotoButton: {
     marginTop: -Spacing.xs,
+  },
+  // 🆕 فاز M09
+  videoSectionDivider: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  videoPreviewWrap: {
+    width: 140,
+    height: 105,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+  },
+  videoPreviewPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(6,182,212,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hiddenNoticeCard: {
     backgroundColor: '#fef2f2',

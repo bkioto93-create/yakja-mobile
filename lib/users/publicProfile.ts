@@ -9,6 +9,12 @@
 //
 // بدون نیاز به توکن/ورود (apiFetch اگر توکن نداشته باشد، بدون هدر Authorization درخواست می‌زند —
 // دقیقاً هم‌رفتار با صفحه‌ی وب که برای بازدیدکننده‌ی مهمان هم پروفایل را نشان می‌دهد).
+//
+// 🛠️ فاز M09 — همگام‌سازی با وب: سه فیلدِ تازه (isVip/hasActiveStory/photoUrl) به تایپ اضافه
+// شدند. هر سه از قبل، بدون هیچ تغییری در Route وب، در پاسخِ JSON موجود بودند (وب این‌ها را در
+// فازهای VIP/استوری/عکسِ پروفایل به getPublicUserProfile اضافه کرده بود)؛ این فایلِ موبایل فقط
+// تا امروز آن‌ها را در تایپ نمی‌شناخت، یعنی همیشه در پاسخ می‌آمدند ولی هیچ‌جای موبایل ازشان
+// استفاده نمی‌کرد.
 import { apiFetch } from '@/lib/session';
 
 export type PublicUserProfile = {
@@ -17,6 +23,9 @@ export type PublicUserProfile = {
   memberSinceYear: number;
   listingsCount: number;
   realEstateCount: number;
+  isVip: boolean;
+  hasActiveStory: boolean;
+  photoUrl: string | null;
 };
 
 type PublicProfileResponse = { profile: PublicUserProfile | null };

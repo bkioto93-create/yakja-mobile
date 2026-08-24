@@ -23,6 +23,7 @@ import { useDictionary } from '@/hooks/useDictionary';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FollowActivityBell } from '../FollowActivityBell';
 import { NotificationBell } from '../NotificationBell';
 import { Icons } from '../ui/Icons';
 import { ProvincePickerModal } from './ProvincePickerModal';
@@ -54,7 +55,11 @@ export function ProvinceBar() {
           نمایش داده می‌شد؛ بعد از اضافه‌شدنِ همین نوار، آن هدر سفید یک نوار زائد و بی‌ربط زیرِ
           این نوار تیره شده بود (نوارِ تیره، سفید، دوباره تیره روی هم). راه‌حل: آن هدرِ بومی کاملاً
           حذف شد (رجوع کنید به کامنتِ بالای app/(tabs)/_layout.tsx) و NotificationBell به همین‌جا
-          منتقل شد — یک نوار تیره‌ی یکپارچه، بدون هیچ تکه‌ی سفیدِ اضافه. */}
+          منتقل شد — یک نوار تیره‌ی یکپارچه، بدون هیچ تکه‌ی سفیدِ اضافه.
+          🆕 فاز M09 — همگام‌سازی با وب، سیستم «دنبال‌کردن»: زنگوله‌ی تازه‌ی FollowActivityBell
+          دقیقاً کنارِ همین NotificationBell نشست — خواهرِ هم، دقیقاً هم‌الگو با وب که هم
+          NotificationBell چت و هم FollowActivityBell را کنارِ هم در هدر دارد (رجوع کنید به
+          src/app/[lang]/layout.tsx وب). */}
       <View style={[styles.bar, { paddingTop: insets.top + Spacing.sm }]}>
         <View style={styles.row}>
           <Pressable onPress={() => setIsOpen(true)} style={styles.chip}>
@@ -66,9 +71,12 @@ export function ProvinceBar() {
           </Pressable>
           {/* رنگ صریح چون پس‌زمینه‌ی این نوار تیره است — پیش‌فرضِ خودِ NotificationBell
               (Colors.textMain، برای پس‌زمینه‌ی سفیدِ هدرِ قبلی) روی این پس‌زمینه اصلاً دیده
-              نمی‌شد. برای کاربر مهمان خودِ NotificationBell چیزی رندر نمی‌کند، پس اینجا هم
-              شرط اضافه‌ای لازم نیست. */}
-          <NotificationBell color="rgba(255,255,255,0.92)" />
+              نمی‌شد. برای کاربر مهمان خودِ NotificationBell/FollowActivityBell چیزی رندر
+              نمی‌کنند، پس اینجا هم شرط اضافه‌ای لازم نیست. */}
+          <View style={styles.bellsRow}>
+            <FollowActivityBell color="rgba(255,255,255,0.92)" />
+            <NotificationBell color="rgba(255,255,255,0.92)" />
+          </View>
         </View>
       </View>
 
@@ -95,6 +103,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  // 🆕 فاز M09 — دو زنگوله (فالو + چت) کنارِ هم، با کمی فاصله
+  bellsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   chip: {
     flexDirection: 'row-reverse',

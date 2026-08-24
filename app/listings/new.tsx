@@ -19,21 +19,36 @@
 // برمی‌گرداند (نه URL عمومی)، و createListing این مسیرها را زیر فیلد imagePaths می‌خواهد، نه
 // images — دقیقاً هم‌راستا با قرارداد واقعی Route وب. جزئیات کامل در کامنت‌های
 // lib/marketplace/mutations.ts.
+//
+// 🆕 فاز M09 — همگام‌سازی با وب، آپلودِ ویدئوی کوتاهِ VIP: داخلِ همان گامِ ۲ («عکس‌ها»)، بعدِ
+// گریدِ عکس‌ها، یک بخشِ جداگانه‌ی ویدئو اضافه شد — دقیقاً همان جایگاهی که NewListingWizard.tsx
+// وب هم انتخاب کرده (نه یک گامِ پنجمِ تازه). فقط برای کاربرِ VIP؛ کاربرِ غیر-VIP به‌جایش کارتِ
+// دعوت‌به‌عضویت (VipUpsellNotice) می‌بیند. بدونِ فشرده‌سازیِ سمتِ کلاینت (رجوع کنید به یادداشتِ
+// کاملِ lib/media/videoUpload.ts).
 import { LoginRequiredCard } from '@/components/LoginRequiredCard';
 import { ProvinceSelectField } from '@/components/province/ProvinceSelectField';
 import { Button } from '@/components/ui/Button';
 import { CategoryPicker } from '@/components/ui/CategoryPicker';
+import { Icons } from '@/components/ui/Icons';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { Wizard, WizardStep } from '@/components/ui/Wizard';
+import { VipUpsellNotice } from '@/components/vip/VipUpsellNotice';
 import { Colors, Fonts, Radii, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useDictionary } from '@/hooks/useDictionary';
 import { compressImage } from '@/lib/imageCompression';
 import { LISTING_CATEGORIES, ListingCategoryId } from '@/lib/marketplace/categories';
-import { createListing, MarketplaceApiError, uploadListingImages } from '@/lib/marketplace/mutations';
+import {
+  createListing,
+  MarketplaceApiError,
+  uploadListingImages,
+  uploadListingVideo,
+} from '@/lib/marketplace/mutations';
+import { pickAndValidateVideo, VideoPickError } from '@/lib/media/videoUpload';
 import { normalizeAfghanPhone } from '@/lib/phone';
+import { isUserVip } from '@/lib/vip/vipStatus';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -63,6 +78,8 @@ export default function NewListingScreen() {
   const [province, setProvince] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [compressingCount, setCompressingCount] = useState(0);
+  // 🆕 فاز M09
+  const [videoUri, setVideoUri] = useState<string | null>(null);
 
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -73,6 +90,9 @@ export default function NewListingScreen() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // 🆕 فاز M09
+  const isVip = isUserVip(user?.vipExpiresAt);
 
   if (!isReady) {
     return (
@@ -125,6 +145,21 @@ export default function NewListingScreen() {
 
   const removeImage = (uri: string) => setImages((prev) => prev.filter((u) => u !== uri));
 
+  // 🆕 فاز M09
+  const pickVideo = async () => {
+    try {
+      const picked = await pickAndValidateVideo();
+      if (!picked) return;
+      setVideoUri(picked.uri);
+    } catch (err) {
+      const code = err instanceof VideoPickError ? err.code : 'generic';
+      showToast(
+        (dict.marketplace.wizard.errors as Record<string, string>)[code] ?? dict.marketplace.wizard.errors.generic,
+        'error'
+      );
+    }
+  };
+
   const validateStep3 = () => {
     const errs: Record<string, string> = {};
     if (title.trim().length === 0) errs.title = dict.marketplace.wizard.errors.invalidTitle;
@@ -176,6 +211,10 @@ export default function NewListingScreen() {
       const imagePaths = await uploadListingImages(images);
       const normalizedPhone = normalizeAfghanPhone(contactPhone)!; // isStep3Valid همین را تضمین کرده
 
+      // 🆕 فاز M09 — فقط اگر کاربر واقعاً VIP است آپلود می‌شود؛ دفاعِ در عمقِ سمتِ کلاینت
+      // (سرور هم دوباره همین را بررسی می‌کند).
+      const videoPath = isVip && videoUri ? await uploadListingVideo(videoUri) : null;
+
       await createListing({
         category,
         province: province as string,
@@ -185,6 +224,7 @@ export default function NewListingScreen() {
         contactPhone: normalizedPhone,
         description: description.trim().length > 0 ? description.trim() : null,
         imagePaths,
+        videoPath,
         latitude,
         longitude,
       });
@@ -250,6 +290,37 @@ export default function NewListingScreen() {
               onPress={addPhotos}
               style={styles.addPhotoButton}
             />
+          )}
+
+          {/* 🆕 فاز M09 — همان گام، بعدِ عکس‌ها؛ دقیقاً هم‌جایگاه با وب. */}
+          <View style={styles.videoSectionDivider}>
+            <Text style={styles.videoSectionTitle}>{dict.marketplace.wizard.videoTitle}</Text>
+          </View>
+          {!isVip ? (
+            <VipUpsellNotice message={dict.vip.upsell.videoMessage} buttonLabel={dict.vip.upsell.button} />
+          ) : videoUri ? (
+            <View style={styles.videoPreviewWrap}>
+              <View style={styles.videoPreviewPlaceholder}>
+                <Icons.CheckCircle size={22} color={Colors.primary} />
+              </View>
+              <Pressable
+                onPress={() => setVideoUri(null)}
+                accessibilityLabel={dict.marketplace.wizard.removeVideoLabel}
+                style={styles.removeBadge}>
+                <Text style={styles.removeBadgeText}>×</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <Button
+                title={dict.marketplace.wizard.addVideoButton}
+                variant="secondary"
+                onPress={pickVideo}
+              />
+              <Text style={styles.videoTrimNotice}>
+                {dict.marketplace.wizard.videoTrimNoticeTemplate.replace('{seconds}', '60')}
+              </Text>
+            </>
           )}
         </ScrollView>
       ),
@@ -413,6 +484,41 @@ const styles = StyleSheet.create({
   },
   addPhotoButton: {
     marginTop: Spacing.md,
+  },
+  // 🆕 فاز M09
+  videoSectionDivider: {
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  videoSectionTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  videoPreviewWrap: {
+    width: 140,
+    height: 105,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+    alignSelf: 'center',
+  },
+  videoPreviewPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(6,182,212,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoTrimNotice: {
+    fontSize: 11,
+    fontFamily: Fonts.regular,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
   multilineInput: {
     minHeight: 80,

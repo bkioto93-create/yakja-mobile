@@ -30,17 +30,26 @@ import { LoginRequiredCard } from '@/components/LoginRequiredCard';
 import { ProvinceSelectField } from '@/components/province/ProvinceSelectField';
 import { Button } from '@/components/ui/Button';
 import { CategoryPicker } from '@/components/ui/CategoryPicker';
+import { Icons } from '@/components/ui/Icons';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { Wizard, WizardStep } from '@/components/ui/Wizard';
+import { VipUpsellNotice } from '@/components/vip/VipUpsellNotice';
 import { Colors, Fonts, Radii, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useDictionary } from '@/hooks/useDictionary';
 import { compressImage } from '@/lib/imageCompression';
+import { pickAndValidateVideo, VideoPickError } from '@/lib/media/videoUpload';
 import { DealTypeId } from '@/lib/realEstate/dealTypes';
-import { createRealEstateListing, RealEstateApiError, uploadRealEstateImages } from '@/lib/realEstate/mutations';
+import {
+  createRealEstateListing,
+  RealEstateApiError,
+  uploadRealEstateImages,
+  uploadRealEstateVideo,
+} from '@/lib/realEstate/mutations';
 import { PROPERTY_TYPES, PropertyTypeId } from '@/lib/realEstate/propertyTypes';
+import { isUserVip } from '@/lib/vip/vipStatus';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -86,6 +95,8 @@ export default function NewRealEstateScreen() {
   const [dealType, setDealType] = useState<DealTypeId | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [compressingCount, setCompressingCount] = useState(0);
+  // 🆕 فاز M09
+  const [videoUri, setVideoUri] = useState<string | null>(null);
 
   const [price, setPrice] = useState('');
   const [address, setAddress] = useState('');
@@ -123,6 +134,20 @@ export default function NewRealEstateScreen() {
 
   // آیا نوع ملک انتخاب‌شده نیاز به پرسش جداگانه‌ی «فروش یا اجاره؟» دارد؟
   const needsDealTypeQuestion = propertyType !== null && IMPLIED_DEAL_TYPE[propertyType] === null;
+
+  // 🆕 فاز M09
+  const isVip = isUserVip(user.vipExpiresAt);
+
+  const pickVideo = async () => {
+    try {
+      const picked = await pickAndValidateVideo();
+      if (!picked) return;
+      setVideoUri(picked.uri);
+    } catch (err) {
+      const code = err instanceof VideoPickError ? err.code : 'generic';
+      showToast(errorsDict[code] ?? errorsDict.generic, 'error');
+    }
+  };
 
   const addPhotos = async () => {
     const remaining = MAX_PHOTOS - images.length;
@@ -197,6 +222,10 @@ export default function NewRealEstateScreen() {
 
       const imagePaths = await uploadRealEstateImages(images);
 
+      // 🆕 فاز M09 — فقط اگر کاربر واقعاً VIP است آپلود می‌شود؛ دفاعِ در عمقِ سمتِ کلاینت
+      // (سرور هم دوباره همین را بررسی می‌کند).
+      const videoPath = isVip && videoUri ? await uploadRealEstateVideo(videoUri) : null;
+
       await createRealEstateListing({
         propertyType,
         dealType,
@@ -205,6 +234,7 @@ export default function NewRealEstateScreen() {
         address: address.trim(),
         description: description.trim(),
         imagePaths,
+        videoPath,
         latitude,
         longitude,
       });
@@ -296,6 +326,28 @@ export default function NewRealEstateScreen() {
               onPress={addPhotos}
               style={styles.addPhotoButton}
             />
+          )}
+
+          {/* 🆕 فاز M09 — همان گام، بعدِ عکس‌ها؛ دقیقاً هم‌جایگاه با وب. */}
+          <View style={styles.videoSectionDivider}>
+            <Text style={styles.videoSectionTitle}>{wizardDict.videoTitle}</Text>
+          </View>
+          {!isVip ? (
+            <VipUpsellNotice message={dict.vip.upsell.videoMessage} buttonLabel={dict.vip.upsell.button} />
+          ) : videoUri ? (
+            <View style={styles.videoPreviewWrap}>
+              <View style={styles.videoPreviewPlaceholder}>
+                <Icons.CheckCircle size={22} color={Colors.primary} />
+              </View>
+              <Pressable
+                onPress={() => setVideoUri(null)}
+                accessibilityLabel={wizardDict.removeVideoLabel}
+                style={styles.removeBadge}>
+                <Text style={styles.removeBadgeText}>×</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Button title={wizardDict.addVideoButton} variant="secondary" onPress={pickVideo} />
           )}
         </ScrollView>
       ),
@@ -483,6 +535,34 @@ const styles = StyleSheet.create({
   },
   addPhotoButton: {
     marginTop: Spacing.md,
+  },
+  // 🆕 فاز M09
+  videoSectionDivider: {
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  videoSectionTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  videoPreviewWrap: {
+    width: 140,
+    height: 105,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+    alignSelf: 'center',
+  },
+  videoPreviewPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(6,182,212,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   multilineInput: {
     minHeight: 80,

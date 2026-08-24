@@ -1,64 +1,66 @@
 // مسیر فایل: dictionaries/fa.ts
 //
-// 🛠️ به‌روزرسانی (بخش «یکجا چیست؟» + بازگردانی «چرا یکجا»/FAQ به صفحه‌ی اصلی): بخش تازه‌ی
-// dict.home.about اضافه شد — برای معرفیِ کاملِ خدماتِ یکجا در پایین‌ترین بخش صفحه‌ی اصلی (بعد از
-// هر تغییر تازه‌ای که کارفرما اضافه می‌کند — استوری، VIP، دسته‌بندی‌ها — این بخش باید به‌روز نگه
-// داشته شود). dict.home.features و dict.home.faq از قبل در این فایل بودند و دست‌نخورده ماندند.
+// 🛠️ رفعِ باگِ متنیِ جامانده (بازبینیِ کاملِ فاز M09 — تاییدِ نهاییِ همگام‌سازی): وقتی فرمِ
+// پروفایلِ راننده به «عکسِ شخصیِ الزامی + عکسِ وسیله‌ی اختیاری» بازطراحی شد (app/transport/driver.tsx)،
+// دو کلید — transport.driverProfile.photosSectionTitle و photosHint — عمداً در همان تسک
+// دست‌نخورده مانده بودند (طبق یادداشتِ فازِ اول دیکشنری: «چون این redesign کد هم لازم دارد، در
+// یک تسکِ جدا انجام می‌شود»)، ولی وقتی آن تسک انجام شد، برگشتن و به‌روزکردنِ همین دو مقدارِ متنی
+// فراموش شد — نتیجه: عنوانِ بخش هنوز «عکس‌ها (اختیاری)» می‌گفت (درحالی‌که یکی از دو عکس الان
+// الزامی است) و راهنما هنوز از «تا ۵ عکس» حرف می‌زد (درحالی‌که مدلِ تازه فقط دقیقاً دو اسلاتِ
+// معنادار دارد، نه یک گالریِ عمومی). هر دو مقدار الان با متنِ فعلیِ وب یکی شدند.
 //
+// 🛠️ همگام‌سازی با وب — نوبت شروع فاز M09 («یکسان‌سازی موبایل با وب»):
+// این فایل با آخرین نسخه‌ی src/dictionaries/fa.ts وب مقایسه و همگام شد. خلاصه‌ی تغییرات:
+//
+// ۱) متن‌های به‌روزشده (همان کلید، محتوای تازه‌ی وب): عنوان/توضیح صفحه‌ی اصلی (dict.meta)،
+//    برچسب «حمل‌ونقل» در ناوبری، نام دسته‌های «موتر»/«حیوانات» در کالا، و متن عمومی‌ترِ خطای
+//    آپلود در چهار ویزارد (marketplace/transport/services/realEstate) — چون از این پس هم عکس
+//    هم ویدئو می‌تواند آپلود شود، نه فقط عکس.
+//
+// ۲) بخش‌ها/کلیدهای تازه‌ی اضافه‌شده (فقط افزوده شد، هیچ کلید قبلی حذف/جایگزین نشد — پس هیچ
+//    فایل کد فعلی با این تغییر نمی‌شکند؛ این کلیدها در تسک‌های بعدی همین فاز مصرف می‌شوند):
+//    - dict.exchangeRates (کامل): برای فاز بعدیِ صفحه‌ی «اسعار»/مبدل ارز.
+//    - dict.dashboard.quickAccessSubtitle + زیرعنوان هر ۴ ماژول: برای بازطراحی صفحه‌ی اصلی.
+//    - dict.marketplace.wizard.video*، dict.transport.driverProfile.video*،
+//      dict.services.providerProfile.video*، dict.realEstate.wizard.video* (+ خطاهای مربوطه):
+//      برای قابلیت «افزودن ویدئوی کوتاه» ویژه‌ی اعضای VIP.
+//    - dict.transport.disabledNotice + dict.transport.driverProfile.errors.moduleDisabled:
+//      برای پشتیبانی از سوییچ «غیرفعال‌سازی کل ماژول حمل‌ونقل» که ادمین وب می‌تواند بزند.
+//    - dict.transport.driverProfile.personalPhotoLabel/vehiclePhotoLabel/requiredBadge/
+//      optionalBadge/addPersonalPhotoButton/addVehiclePhotoButton + errors.personalPhotoRequired/
+//      invalidPhotoType: برای بازطراحی بخش عکس فرم پروفایل راننده (عکس شخصی الزامی + عکس وسیله
+//      اختیاری، به‌جای «حداکثر ۵ عکس عمومی» فعلی). کلید قدیمی addPhotoButton عمداً حذف نشد —
+//      تا زمانی که app/transport/driver.tsx در یک تسک جداگانه بازنویسی شود، همچنان از همان
+//      کلید قدیمی استفاده می‌کند؛ کلیدهای تازه فعلاً بلااستفاده‌اند، بدون هیچ عارضه‌ای.
+//    - dict.notFound: برای صفحه‌ی «یافت نشد» عمومی (در صورت نیاز).
+//    - dict.contact.sectionTitle/whatsappLabel/extraInfoLabel: برای به‌روزرسانی صفحه‌ی تماس
+//      با گزینه‌ی واتساپ (هم‌تراز با نسخه‌ی تازه‌ی وب).
+//    - dict.profile.photo (کامل): قابلیت «آپلود عکس پروفایل» که در وب هست ولی هنوز در تب
+//      پروفایل موبایل ساخته نشده.
+//    - dict.follows (کامل): کل سیستم «دنبال‌کردن» کاربران (دکمه‌ی فالو، فهرست دنبال‌کنندگان/
+//      دنبال‌شوندگان، اعلان فعالیت) — در وب هست، در موبایل هنوز هیچ‌جا پیاده‌سازی نشده.
+//    - dict.chat.adminSupport.label، dict.stories.viewer.viewersButtonLabel/viewersSheet:
+//      کلیدهای کوچکِ جامانده‌ی مشابه.
+//
+// ۳) عمداً همگام نشد (تصمیم آگاهانه، نه فراموشی):
+//    - dict.home.appDownload، dict.pwaInstall، dict.download، dict.footer.*: مفاهیم مخصوص
+//      نسخه‌ی وب (نصب PWA، دانلود APK از داخل مرورگر، فوتر صفحه) — در اپ موبایل بی‌معنا.
+//    - dict.admin.*: پنل مدیریت طبق سند راهبردی موبایل (بند ۱.۲) خارج از محدوده‌ی این پروژه است.
+//    - هر کلید metaTitle/metaDescription: فقط برای SEO صفحات وب.
+//    - transport.list.locationDeniedNotice، transport.driverProfile.locationTracking
+//      DeniedNotice/UnsupportedNotice، chat.errors.voiceNotSupported/microphonePermissionDenied:
+//      نسخه‌ی فعلی موبایل قبلاً عمداً برای واژگان «گوشی» به‌جای «مرورگر» اصلاح شده بود (فاز M03)
+//      — دست‌نخورده ماند، چون نسخه‌ی خودش از وب هم برای همین پلتفرم درست‌تر است.
+//    - transport.driverProfile.photosSectionTitle/photosHint: به بازطراحیِ بند «۲» بالا
+//      (عکس شخصی/وسیله) گره خورده‌اند؛ همراه با بازنویسیِ خودِ driver.tsx به‌روزرسانی می‌شوند،
+//      نه جدا.
+//
+// نسخه‌ی پشتوی این فایل (ps.ts) هم به همین الگو و هم‌زمان به‌روزرسانی شد.
 
-// مسیر فایل: dictionaries/fa.ts
-//
-// 🛠️ به‌روزرسانی (فاز ۱۰ موبایل — قابلیت «ولایت»): بخش تازه‌ی province (دقیقاً هم‌محتوا با
-// dict.province وب: src/dictionaries/fa.ts) اضافه شد — تا امروز این کلید در دیکشنری موبایل
-// اصلاً وجود نداشت. هم‌زمان، چهار پیام خطای تازه‌ی invalidProvince (marketplace.wizard.errors،
-// transport.driverProfile.errors، services.providerProfile.errors، realEstate.wizard.errors)
-// اضافه شدند — دقیقاً همان کدهایی که چهار Route وب (listings/real-estate/driver/provider) از قبل
-// در پاسخ خطا برمی‌گردانند اگر ولایت ارسال نشده/نامعتبر باشد؛ بدون این کلیدها، پیام «مشکلی پیش
-// آمد» عمومی نمایش داده می‌شد، نه پیام دقیق «لطفاً ولایت را انتخاب کنید.».
-//
-
-// مسیر فایل: dictionaries/fa.ts
-//
-// اصلاح ممیزی تسک ۹ فاز M00B: کلید common.comingSoon تازه اضافه شد — قبلاً متن «این صفحه هنوز
-// ساخته نشده — به‌زودی» مستقیم داخل components/PlaceholderScreen.tsx هاردکد بود (نقض الزام
-// قطعی ۲)؛ حالا از همین‌جا خوانده می‌شود.
-//
-// 🛠️ به‌روزرسانی فاز M02 (تسک ۷ — صفحه‌ی «آگهی‌های من»): کلید marketplace.index.myListingsButton
-// و بخش کامل marketplace.myListings تازه اضافه شدند. نقشه‌راه هیچ متنی برای این صفحه از قبل
-// ننوشته بود (برخلاف index/wizard/detail که هر سه پیش‌تر کامل بودند)، پس این متن‌ها اینجا تازه
-// نوشته شدند — دقیقاً هم‌سبک و هم‌الگو با باقی دیکشنری (لحن، طول جمله، استفاده‌ی مشابه از
-// loginRequiredTitle/Desc/Button).
-//
-// 🛠️ به‌روزرسانی فاز M03، تسک ۷ (جستجوی دستی شهر/منطقه به‌جای GPS، ماژول حمل‌ونقل): پنج کلید تازه
-// به transport.list اضافه شد: searchPlaceholder، searchButton، searchingButton،
-// searchNotFoundNotice، sortedBySearchNotice. تفاوت مهم با marketplace.index/services.list/
-// realEstate.index: در آن سه ماژول، searchPlaceholder یک جستجوی متنی واقعی سمت سرور است (چون
-// listings/service_providers/real_estate همگی ستون address دارند و p_query در تابع Postgres
-// روی همان ستون ILIKE می‌زند). جدول drivers هیچ ستون آدرس/شهر متنی ندارد (نگاه کنید به
-// docs/YAKJA_DATABASE_LOG.md — فقط vehicle_type، vehicle_details، contact_phone، location
-// (geography point)، is_active، last_location_update)، و get_active_drivers هم هیچ‌وقت p_query
-// نگرفته. پس این پنج کلید پشت یک مکانیزم متفاوت‌اند: نام واردشده با Location.geocodeAsync
-// (Forward Geocoding آفلاین‌بی‌نیاز از مجوز GPS دستگاه، فقط نیازمند اینترنت) به یک مختصات
-// تبدیل می‌شود و همان state موجود coords (که قبلاً فقط با دکمه‌ی GPS پر می‌شد) با آن پر می‌گردد —
-// صفر تغییر در get_active_drivers یا هر تابع Postgres دیگر؛ جزئیات کامل در کامنت بالای
-// app/(tabs)/transport.tsx. کلید locationDeniedNotice هم به همین مناسبت به‌روزرسانی شد تا مثل
-// نمونه‌ی services.list، وجود همین کادر جستجو را به کاربر یادآوری کند.
-//
-// 🛠️ به‌روزرسانی فاز M04، تسک ۱ (فهرست/جستجوی متخصصین): دو کلید تازه به services.list اضافه شد:
-// locationBlockedNotice و locationServicesDisabledNotice — دقیقاً هم‌متن با معادل‌های
-// transport.list (تسک ۶ فاز M03)، فقط «رانندگان» با «متخصصان» جایگزین شد. چون فاز M04 هیچ تسک
-// جداگانه‌ای برای مدیریت دقیق مجوز GPS ندارد (برخلاف M03 که تسک ۶ مجزا داشت)، همان کتابخانه‌ی
-// مشترک lib/location.ts (requestLocationAccess، از قبل ساخته‌شده در تسک ۶ فاز M03) از همین تسک ۱
-// در app/(tabs)/services.tsx استفاده شد — نه یک نسخه‌ی ساده‌تر مثل app/(tabs)/listings.tsx.
-// ⚠️ یادداشت جزئی (غیرمسدودکننده): متن فعلی locationDeniedNotice (بالا) از قبل به «کادر جستجو»
-// اشاره می‌کند، اما آن کادر جستجو خودش موضوع تسک ۴ همین فاز است که هنوز ساخته نشده. این متن عمداً
-// دست‌نخورده ماند (تغییرش خارج از دامنه‌ی دقیق تسک ۱ بود)؛ وقتی تسک ۴ کادر جستجو را ساخت، این جمله
-// دیگر کاملاً درست خواهد بود؛ تا آن زمان فقط یک ناهماهنگی متنی بی‌خطر است، دقیقاً هم‌کلاس با
-// یادداشت‌های مشابه «مورد باز، غیرمسدودکننده» که در بقیه‌ی این پروژه هم مستند شده‌اند.
 export default {
   "meta": {
-    "title": "یکجا | همه‌چیز، یکجا!",
-    "description": "سوپراپلیکیشن جامع افغانستان. خرید و فروش کالا، درخواست راننده، یافتن نیروی کار فنی و املاک. عاجل، سبک و بدون واسطه. تمام نیازهای تو، یکجا!"
+    "title": "یکجا | خرید، فروش، حمل‌ونقل و خدمات در افغانستان",
+    "description": "سوپراپلیکیشن جامع افغانستان برای خرید و فروش کالا، درخواست راننده، خدمات فنی و املاک؛ عاجل، سبک و بدون واسطه."
   },
   "home": {
     "heroBadge": "نسل جدید پلتفرم‌های هوشمند",
@@ -182,7 +184,7 @@ export default {
   "nav": {
     "home": "خانه",
     "listings": "کالا",
-    "transport": "بار و نفر",
+    "transport": "بار و مسافر",
     "services": "خدمات",
     "profile": "من"
   },
@@ -256,8 +258,13 @@ export default {
       "listings": "خرید و فروش کالا",
       "transport": "درخواست راننده و بار",
       "services": "نیروی کار و خدمات",
-      "realEstate": "املاک"
-    }
+      "realEstate": "املاک",
+      "listingsSubtitle": "خرید و فروش سریع و مطمئن",
+      "transportSubtitle": "درخواست تاکسی و سفر",
+      "servicesSubtitle": "خدمات فنی و کارگری",
+      "realEstateSubtitle": "خرید، فروش و رهن و کرایه"
+    },
+    "quickAccessSubtitle": "خدمات ضروری در سریع‌ترین زمان"
   },
   "marketplace": {
     "categories": {
@@ -266,8 +273,8 @@ export default {
       "clothing": "پوشاک",
       "homeGoods": "لوازم منزل",
       "motorcycle": "موتورسیکلت",
-      "car": "خودرو",
-      "livestock": "دام",
+      "car": "موتر",
+      "livestock": "حیوانات",
       "agriculture": "محصولات کشاورزی",
       "other": "سایر"
     },
@@ -323,11 +330,27 @@ export default {
         "invalidAddress": "لطفاً آدرس یا منطقه را وارد کنید.",
         "invalidPhone": "شماره تماس واردشده نامعتبر است.",
         "invalidImageData": "یکی از عکس‌ها قابل پردازش نیست.",
-        "uploadFailed": "بارگذاری عکس‌ها با مشکل مواجه شد؛ دوباره امتحان کنید.",
+        "uploadFailed": "بارگذاری فایل‌ها با مشکل مواجه شد؛ دوباره امتحان کنید.",
         "dbError": "ثبت آگهی با مشکل مواجه شد؛ دوباره امتحان کنید.",
         "compressionFailed": "پردازش این عکس ممکن نشد؛ عکس دیگری امتحان کنید.",
-        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید."
-      }
+        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید.",
+        "invalidVideoType": "فقط فایل ویدئویی قابل قبول است.",
+        "videoTooLarge": "حجم فایل ویدئوی انتخابی خیلی زیاد است؛ ویدئوی کوچک‌تری انتخاب کنید.",
+        "invalidVideoData": "ویدئوی انتخاب‌شده قابل پردازش نیست.",
+        "notVip": "افزودن ویدئو فقط برای اعضای VIP فعال است.",
+        "dailyLimitReached": "شما امروز به سقف ۲ آگهی رایگان رسیده‌اید. برای ثبت آگهی نامحدود، عضو VIP شوید.",
+        "videoRecordingUnsupported": "مرورگرت از فشرده‌سازی ویدئو پشتیبانی نمی‌کند؛ لطفاً از مرورگر دیگری استفاده کن یا بدون ویدئو ادامه بده.",
+        "videoFileTooLarge": "حجم فایل ویدئوی انتخابی خیلی زیاد است؛ ویدئوی کوچک‌تری انتخاب کنید.",
+        "videoUnreadable": "این ویدئو قابل خواندن نیست؛ ویدئوی دیگری انتخاب کنید.",
+        "canvasContextUnavailable": "مرورگرت این قابلیت را پشتیبانی نمی‌کند.",
+        "videoCompressionFailed": "فشرده‌سازی ویدئو با مشکل مواجه شد؛ دوباره امتحان کنید.",
+        "videoTooLargeAfterCompression": "حتی بعد از فشرده‌سازی هم حجم ویدئو زیاد است؛ ویدئوی کوتاه‌تری انتخاب کنید."
+      },
+      "videoTitle": "ویدئوی کوتاه (اختیاری، ویژه‌ی VIP)",
+      "addVideoButton": "افزودن ویدئو",
+      "removeVideoLabel": "حذف این ویدئو",
+      "compressingVideoLabel": "در حال فشرده‌سازی ویدئو...",
+      "videoTrimNoticeTemplate": "فقط {seconds} ثانیه‌ی اول ویدئو استفاده می‌شود"
     },
     "detail": {
       "backButton": "بازگشت به فهرست",
@@ -416,8 +439,8 @@ export default {
       "loginRequiredTitle": "ابتدا وارد شوید",
       "loginRequiredDesc": "برای ثبت یا ویرایش پروفایل راننده، لازم است ابتدا با شماره موبایل خود وارد حساب شوید.",
       "loginRequiredButton": "ورود به حساب",
-      "photosSectionTitle": "عکس‌ها (اختیاری)",
-      "photosHint": "می‌توانید تا ۵ عکس از خودتان یا وسیله‌تان اضافه کنید تا اعتماد متقاضیان بیشتر شود.",
+      "photosSectionTitle": "عکس‌ها",
+      "photosHint": "عکس خودتان الزامی است؛ عکس وسیله‌ی نقلیه اختیاری است اما اعتماد متقاضیان را بیشتر می‌کند.",
       "addPhotoButton": "افزودن عکس",
       "removePhotoLabel": "حذف عکس",
       "errors": {
@@ -431,9 +454,29 @@ export default {
         "invalidImageCount": "تعداد عکس‌ها بیش از حد مجاز است.",
         "invalidImageData": "یکی از عکس‌ها نامعتبر است؛ دوباره امتحان کنید.",
         "compressionFailed": "فشرده‌سازی عکس با مشکل مواجه شد؛ عکس دیگری امتحان کنید.",
-        "uploadFailed": "آپلود عکس با مشکل مواجه شد؛ دوباره امتحان کنید.",
-        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید."
-      }
+        "uploadFailed": "آپلود فایل با مشکل مواجه شد؛ دوباره امتحان کنید.",
+        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید.",
+        "personalPhotoRequired": "افزودن عکس خودتان الزامی است.",
+        "invalidPhotoType": "نوع عکس نامعتبر است.",
+        "invalidVideoType": "فقط فایل ویدئویی قابل قبول است.",
+        "videoTooLarge": "حجم ویدئو نباید بیشتر از ۲۰ مگابایت باشد.",
+        "invalidVideoData": "ویدئوی انتخاب‌شده قابل پردازش نیست.",
+        "notVip": "افزودن ویدئو فقط برای اعضای VIP فعال است.",
+        "moduleDisabled": "بخش تاکسی و مسافر در حال حاضر غیرفعال می‌باشد و به‌زودی فعال می‌شود."
+      },
+      "personalPhotoLabel": "عکس خودتان",
+      "vehiclePhotoLabel": "عکس وسیله‌ی نقلیه",
+      "requiredBadge": "الزامی",
+      "optionalBadge": "اختیاری",
+      "addPersonalPhotoButton": "افزودن عکس خودتان",
+      "addVehiclePhotoButton": "افزودن عکس وسیله",
+      "videoSectionTitle": "ویدئوی کوتاه (اختیاری، ویژه‌ی VIP)",
+      "addVideoButton": "افزودن ویدئو",
+      "removeVideoLabel": "حذف این ویدئو"
+    },
+    "disabledNotice": {
+      "title": "این بخش در حال حاضر غیرفعال می‌باشد",
+      "message": "بخش تاکسی و مسافر در حال حاضر غیرفعال می‌باشد و به‌زودی فعال می‌شود."
     }
   },
   "services": {
@@ -470,9 +513,16 @@ export default {
         "invalidImageCount": "تعداد عکس‌ها بیش از حد مجاز است.",
         "invalidImageData": "یکی از عکس‌ها نامعتبر است؛ دوباره امتحان کنید.",
         "compressionFailed": "فشرده‌سازی عکس با مشکل مواجه شد؛ عکس دیگری امتحان کنید.",
-        "uploadFailed": "آپلود عکس با مشکل مواجه شد؛ دوباره امتحان کنید.",
-        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید."
-      }
+        "uploadFailed": "آپلود فایل با مشکل مواجه شد؛ دوباره امتحان کنید.",
+        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید.",
+        "invalidVideoType": "فقط فایل ویدئویی قابل قبول است.",
+        "videoTooLarge": "حجم ویدئو نباید بیشتر از ۲۰ مگابایت باشد.",
+        "invalidVideoData": "ویدئوی انتخاب‌شده قابل پردازش نیست.",
+        "notVip": "افزودن ویدئو فقط برای اعضای VIP فعال است."
+      },
+      "videoSectionTitle": "ویدئوی کوتاه (اختیاری، ویژه‌ی VIP)",
+      "addVideoButton": "افزودن ویدئو",
+      "removeVideoLabel": "حذف این ویدئو"
     },
     "list": {
       "title": "خدمات و نیروی کار فنی",
@@ -564,10 +614,18 @@ export default {
         "invalidAddress": "لطفاً آدرس یا منطقه را وارد کنید.",
         "invalidImageData": "یکی از عکس‌ها قابل پردازش نیست.",
         "compressionFailed": "پردازش این عکس ممکن نشد؛ عکس دیگری امتحان کنید.",
-        "uploadFailed": "بارگذاری عکس‌ها با مشکل مواجه شد؛ دوباره امتحان کنید.",
+        "uploadFailed": "بارگذاری فایل‌ها با مشکل مواجه شد؛ دوباره امتحان کنید.",
         "dbError": "ثبت آگهی ملک با مشکل مواجه شد؛ دوباره امتحان کنید.",
-        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید."
-      }
+        "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید.",
+        "invalidVideoType": "فقط فایل ویدئویی قابل قبول است.",
+        "videoTooLarge": "حجم ویدئو نباید بیشتر از ۲۰ مگابایت باشد.",
+        "invalidVideoData": "ویدئوی انتخاب‌شده قابل پردازش نیست.",
+        "notVip": "افزودن ویدئو فقط برای اعضای VIP فعال است.",
+        "dailyLimitReached": "شما امروز به سقف ۲ آگهی رایگان رسیده‌اید. برای ثبت آگهی نامحدود، عضو VIP شوید."
+      },
+      "videoTitle": "ویدئوی کوتاه (اختیاری، ویژه‌ی VIP)",
+      "addVideoButton": "افزودن ویدئو",
+      "removeVideoLabel": "حذف این ویدئو"
     },
     "detail": {
       "backButton": "بازگشت به فهرست",
@@ -613,7 +671,17 @@ export default {
       "minutesAgoTemplate": "{minutes} دقیقه پیش",
       "hoursAgoTemplate": "{hours} ساعت پیش",
       "previousLabel": "استوری قبلی",
-      "nextLabel": "استوری بعدی"
+      "nextLabel": "استوری بعدی",
+      "viewersButtonLabel": "بازدیدکنندگان",
+      "viewersSheet": {
+        "title": "بازدیدکنندگان",
+        "closeLabel": "بستن",
+        "loadErrorMessage": "بارگذاری بازدیدکنندگان با مشکل مواجه شد.",
+        "emptyTitle": "هنوز کسی ندیده",
+        "emptyDesc": "وقتی کسی این استوری را ببیند، همین‌جا نشان داده می‌شود.",
+        "fallbackName": "کاربر یکجا",
+        "vipBadgeLabel": "VIP"
+      }
     },
     "addSection": {
       "title": "استوری بگذار",
@@ -704,7 +772,8 @@ export default {
         "cannotChatWithSelf": "شما نمی‌توانید با خودتان گفتگو کنید.",
         "dbError": "شروع گفتگو با مشکل مواجه شد؛ دوباره امتحان کنید.",
         "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید."
-      }
+      },
+      "label": "پشتیبانی یکجا"
     }
   },
   "vip": {
@@ -816,7 +885,10 @@ export default {
     "phoneVal": "+93 78 663 3322",
     "addressVal": "افغانستان، کابل، شهر نو، چهارراه انصاری، مجتمع تجاری یکجا، طبقه ۳",
     "domainVal": "yakja.top",
-    "brandVal": "یکجا | YAKJA"
+    "brandVal": "یکجا | YAKJA",
+    "sectionTitle": "اطلاعات و تماس یکجا",
+    "whatsappLabel": "واتساپ",
+    "extraInfoLabel": "توضیحات تکمیلی"
   },
   "footer": {
     "copyright": "تمامی حقوق برای پلتفرم یکجا محفوظ است.",
@@ -1063,7 +1135,34 @@ export default {
     "languageDesc": "زبان نمایش تمام صفحه‌ها را از همین‌جا تغییر بده.",
     "languageFa": "دری",
     "languagePs": "پښتو",
-    "logout": "خروج از حساب"
+    "logout": "خروج از حساب",
+    "photo": {
+      "title": "عکس پروفایل",
+      "description": "یک عکس واضح از خودت بگذار؛ بعد از تایید مدیریت در همه‌جا نمایش داده می‌شود.",
+      "changeButton": "تغییر عکس پروفایل",
+      "addButton": "افزودن عکس پروفایل",
+      "compressingLabel": "در حال آماده‌سازی...",
+      "uploadingLabel": "در حال آپلود...",
+      "successMessage": "عکس پروفایل با موفقیت ارسال شد و در انتظار تایید مدیریت است.",
+      "statusPending": "در حال تایید مدیریت",
+      "statusApproved": "تایید شده",
+      "statusRejected": "رد شده — یک عکس تازه امتحان کن",
+      "deleteButton": "حذف عکس پروفایل",
+      "deleteConfirm": "عکس پروفایلت کاملاً پاک می‌شود. ادامه می‌دهی؟",
+      "deleteSuccessMessage": "عکس پروفایل حذف شد.",
+      "deleteError": "حذف عکس با مشکل مواجه شد؛ دوباره امتحان کن.",
+      "errors": {
+        "unauthenticated": "برای تغییر عکس پروفایل ابتدا وارد حساب خود شو.",
+        "invalidPhotoData": "مشکلی در داده‌ی عکس پیش آمد؛ دوباره امتحان کن.",
+        "uploadFailed": "آپلود عکس با مشکل مواجه شد؛ دوباره امتحان کن.",
+        "dbError": "یک مشکل فنی پیش آمد؛ دوباره امتحان کن.",
+        "notFound": "عکسی برای حذف پیدا نشد.",
+        "imageUnreadable": "این عکس قابل خواندن نیست؛ عکس دیگری انتخاب کن.",
+        "imageConversionFailed": "پردازش عکس با مشکل مواجه شد؛ دوباره امتحان کن.",
+        "canvasContextUnavailable": "مرورگرت این قابلیت را پشتیبانی نمی‌کند.",
+        "generic": "مشکلی پیش آمد؛ دوباره امتحان کن."
+      }
+    }
   },
   "reports": {
     "reportButtonLabel": "گزارش تخلف",
@@ -1110,6 +1209,71 @@ export default {
       "notFoundTitle": "این کاربر یافت نشد",
       "notFoundDesc": "ممکن است این حساب حذف شده یا مسدود شده باشد.",
       "backToHomeButton": "بازگشت به صفحه اصلی"
+    }
+  },
+  "exchangeRates": {
+    "title": "اسعار",
+    "subtitle": "نرخ لحظه‌ای ارزهای پرکاربرد در بازار افغانستان",
+    "sourceLabel": "منبع: سرای شهزاده کابل",
+    "buyLabel": "خرید",
+    "sellLabel": "فروش",
+    "currencyLabel": "ارز",
+    "trendLabel": "روند",
+    "afnLabel": "افغانی",
+    "converterTitle": "مبدل سریع",
+    "amountPlaceholder": "مقدار را وارد کنید",
+    "resultLabel": "معادل:",
+    "disclaimer": "نرخ‌ها تقریبی و بر اساس بازار سرای شهزاده کابل‌اند؛ ممکن است با نرخ لحظه‌ای صرافی‌ها اندکی تفاوت داشته باشند. پیش از هر معامله، نرخ را حتماً با صرافی تایید کنید.",
+    "justNowLabel": "همین حالا",
+    "minutesAgoTemplate": "{minutes} دقیقه پیش",
+    "hoursAgoTemplate": "{hours} ساعت پیش",
+    "perThousandBadgeLabel": "هر ۱۰۰۰",
+    "perThousandNoteTemplate": "نرخِ {code} برای هر ۱۰۰۰ واحد است، نه ۱ واحد؛ مبلغ بالا بر همین اساس محاسبه شده."
+  },
+  "notFound": {
+    "title": "این صفحه پیدا نشد",
+    "message": "لینکی که دنبالش بودید یا حذف شده یا از اول اشتباه بوده. نگران نباشید، از اینجا می‌تونید به مسیر درست برگردید.",
+    "backHomeButton": "بازگشت به صفحه اصلی",
+    "backButton": "بازگشت به صفحه قبل"
+  },
+  "follows": {
+    "followersLabel": "دنبال‌کننده",
+    "followingLabel": "دنبال‌شونده",
+    "followButton": "فالو",
+    "followBackButton": "فالو بک",
+    "followingButton": "دنبال می‌کنید",
+    "unfollowConfirmQuestion": "لغو فالو؟",
+    "unfollowConfirmYes": "بله",
+    "unfollowConfirmCancel": "بیخیال",
+    "followersPageTitle": "دنبال‌کنندگان",
+    "followingPageTitle": "دنبال‌شوندگان",
+    "emptyFollowersTitle": "هنوز دنبال‌کننده‌ای نیست",
+    "emptyFollowersDesc": "وقتی کسی این حساب را فالو کند، همین‌جا نشان داده می‌شود.",
+    "emptyFollowingTitle": "هنوز کسی را فالو نکرده",
+    "emptyFollowingDesc": "وقتی این حساب کسی را فالو کند، همین‌جا نشان داده می‌شود.",
+    "loadMore": "نمایش بیشتر",
+    "loadingMore": "در حال بارگذاری…",
+    "endOfList": "به انتهای فهرست رسیدی",
+    "loadMoreError": "بارگذاری با مشکل مواجه شد؛ دوباره امتحان کن.",
+    "activityBellAriaLabel": "فعالیت‌های فالو",
+    "activityPageTitle": "فعالیت‌ها",
+    "emptyActivityTitle": "هنوز فعالیتی نیست",
+    "emptyActivityDesc": "وقتی کسی شما را فالو کند، همین‌جا می‌بینید.",
+    "followedYouText": "شما را فالو کرد",
+    "followedYouBackText": "فالوی شما را جواب داد",
+    "justNow": "همین حالا",
+    "minutesAgoTemplate": "{minutes} دقیقه پیش",
+    "hoursAgoTemplate": "{hours} ساعت پیش",
+    "daysAgoTemplate": "{days} روز پیش",
+    "loginRequiredTitle": "ابتدا وارد شوید",
+    "loginRequiredDesc": "برای دیدن فعالیت‌های فالو، لازم است ابتدا با شماره موبایل خود وارد حساب شوید.",
+    "loginRequiredButton": "ورود به حساب",
+    "errors": {
+      "unauthenticated": "ابتدا باید وارد حساب خود شوید.",
+      "invalidTarget": "این عملیات روی این حساب ممکن نیست.",
+      "userNotFound": "این کاربر یافت نشد.",
+      "dbError": "مشکلی پیش آمد؛ دوباره امتحان کنید.",
+      "generic": "مشکلی پیش آمد؛ دوباره امتحان کنید."
     }
   }
 };

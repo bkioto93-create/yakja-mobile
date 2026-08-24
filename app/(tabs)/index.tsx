@@ -31,7 +31,19 @@
 // می‌گیرد (با Promise.allSettled — رجوع کنید به کامنت بالای همان فایل برای یک باگِ جدیِ دیگر که
 // همان‌جا رفع شد) — دو مورد (کالا/ملک) مستقیم با Anon Key از توابع RPC عمومیِ از-قبل-موجود، دو
 // مورد دیگر (راننده/متخصص) از Route پل موبایل.
+//
+// 🛠️ فاز M09 — همگام‌سازی با وب (طبق درخواستِ صریحِ کارفرما، فقط دو بخشِ تازه‌ی زیر؛ بقیه‌ی
+// صفحه — هیرو، ردیفِ استوری، بنرِ VIP، «چرا یکجا»، FAQ، «یکجا چیست؟» — عمداً دست‌نخورده ماندند،
+// چون این‌ها قبلاً طیِ چند دورِ بازخوردِ جداگانه به‌طور آگاهانه از طراحیِ وب فاصله گرفته بودند):
+//   ۱) «دسترسی عاجل»: MODULE_COLORS قبلی (gradient/glow برایِ کارتِ تیره‌ی نسخه‌ی دوم) با
+//      MODULE_ACCENTS جایگزین شد — فقط یک accentColor به‌ازای هر ماژول، عیناً همان مقادیرِ
+//      categories[].accentHex در src/app/[lang]/page.tsx وب. خودِ کارت هم بازطراحی شد؛ رجوع
+//      کنید به کامنتِ کاملِ بالای components/ModuleCard.tsx.
+//   ۲) بخشِ «اسعار» — تنها فیچرِ محتواییِ واقعاً جامانده‌ی صفحه‌ی اصلی — بلافاصله بعد از «دسترسی
+//      عاجل» اضافه شد (components/ExchangeRatesSection.tsx)، دقیقاً همان جایگاهی که وب هم برایش
+//      انتخاب کرده («در قسمت‌های بالایی پروژه»، طبق کامنتِ بالای page.tsx وب).
 import { AboutYakja } from '@/components/AboutYakja';
+import { ExchangeRatesSection } from '@/components/ExchangeRatesSection';
 import { ModuleCard } from '@/components/ModuleCard';
 import { StoryRing } from '@/components/stories/StoryRing';
 import { StoryViewer } from '@/components/stories/StoryViewer';
@@ -73,43 +85,17 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const SHOWCASE_ITEM_LIMIT = 10;
 
-// گرادیان/هاله‌ی هر ماژول در گرید دسترسی عاجل — معادل دقیقِ
-// categories[].gradient/glow در src/app/[lang]/page.tsx وب (کلاس‌های Tailwind با درصدِ شفافیت،
-// اینجا به rgba/hex معادل تبدیل شدند تا expo-linear-gradient/GlowBlob بتوانند مستقیم مصرفشان
-// کنند).
-//
-// **رفع باگ (بازخورد کارفرما — «آیکون حمل‌ونقل روی بک‌گراند قهوه‌ای دیده نمی‌شود»):** معادلِ
-// دقیقِ همان رفعِ باگ در src/app/[lang]/page.tsx وب (رجوع کنید به کامنتِ کاملِ آنجا). خلاصه:
-// gradient قبلیِ transport یک نارنجیِ نیمه‌شفاف (rgba با آلفای ۰.۰۵ تا ۰.۲) روی کارتِ تیره‌ی
-// پشتش (Colors.heroDark) بود — نتیجه‌اش یک قهوه‌ای کدر و کم‌کنتراست بود، نه رنگِ روشنِ واقعی.
-// حالا دقیقاً هم‌الگو با سه ماژولِ دیگر، یک زردِ کهربایی (amber) کاملاً پُر و روشن است.
-const MODULE_COLORS = {
-  listings: {
-    icon: '#3b82f6',
-    gradient: ['#dbeafe', '#eff6ff'] as [string, string], // from-blue-100 to-blue-50/40
-    glow: '#60a5fa', // blue-400
-  },
-  transport: {
-    // 🛠️ رفعِ باگِ رنگ (بازخوردِ کارفرما — «رنگِ این یکی قهوه‌ای شده»): زردِ کهربایی (amber) با
-    // شفافیتِ کم روی زمینه‌ی تیره، دقیقاً به قهوه‌ای/زیتونیِ کدر تبدیل می‌شود — این یک اثرِ
-    // شناخته‌شده‌ی ادراکِ رنگ است (زردِ تیره‌وکم‌اشباع = قهوه‌ای، فارغ از این‌که چقدر شفاف باشد؛
-    // با هیچ میزانِ شفافیتی درست نمی‌شود، چون خودِ ماهیتِ رنگ است، نه فقط شفافیتش). رزِ پررنگ
-    // جایگزین شد — این خانواده‌ی رنگی حتی وقتی روی زمینه‌ی تیره تیره‌تر هم بشود، هم‌چنان یک
-    // بنفش/زرشکیِ واضح می‌ماند، نه یک خنثیِ کدر.
-    icon: '#db2777', // pink-600
-    gradient: ['#fce7f3', '#fdf2f8'] as [string, string], // from-pink-100 to-pink-50/40
-    glow: '#ec4899', // pink-500
-  },
-  services: {
-    icon: '#10b981',
-    gradient: ['#d1fae5', '#ecfdf5'] as [string, string], // from-emerald-100 to-emerald-50/40
-    glow: '#34d399', // emerald-400
-  },
-  realEstate: {
-    icon: '#a855f7',
-    gradient: ['#f3e8ff', '#faf5ff'] as [string, string], // from-purple-100 to-purple-50/40
-    glow: '#c084fc', // purple-400
-  },
+// 🛠️ فاز M09 — همگام‌سازی با وب: جایگزینِ MODULE_COLORS قبلی (gradient/glow، مخصوصِ کارتِ
+// تیره‌ی بازطراحیِ دومِ ModuleCard). بازطراحیِ سومِ ModuleCard دیگر هیچ گرادیان/هاله‌ای ندارد —
+// فقط یک accentColor به‌ازای هر ماژول لازم است، عیناً همان مقادیرِ hex در categories[].accentHex
+// (src/app/[lang]/page.tsx وب، بخشِ «بازطراحیِ ششم — دسترسی عاجل»): «رنگِ هر حلقه‌ی فلش دقیقاً از
+// روی خودِ عکسِ طرح نمونه‌برداری شد، نه یک رنگِ نزدیکِ تقریبی». iconColor هم نگه داشته شد — فقط
+// برایِ حالتِ نادرِ شکستِ لودِ تصویر (رجوع کنید به fallbackِ داخلِ ModuleCard.tsx).
+const MODULE_ACCENTS = {
+  listings: { accentColor: '#8269e7', iconColor: '#8269e7' },
+  transport: { accentColor: '#2f9df6', iconColor: '#2f9df6' },
+  services: { accentColor: '#8269e7', iconColor: '#8269e7' },
+  realEstate: { accentColor: '#fb9624', iconColor: '#fb9624' },
 };
 
 export default function HomeScreen() {
@@ -292,41 +278,43 @@ export default function HomeScreen() {
             <ModuleCard
               title={dict.dashboard.categories.listings}
               icon="cube"
-              iconColor={MODULE_COLORS.listings.icon}
-              gradientColors={MODULE_COLORS.listings.gradient}
-              glowColor={MODULE_COLORS.listings.glow}
+              iconColor={MODULE_ACCENTS.listings.iconColor}
+              accentColor={MODULE_ACCENTS.listings.accentColor}
               imageUri={WebAssetIcons.quickListings}
               onPress={() => router.push('/listings')}
             />
             <ModuleCard
               title={dict.dashboard.categories.transport}
               icon="car"
-              iconColor={MODULE_COLORS.transport.icon}
-              gradientColors={MODULE_COLORS.transport.gradient}
-              glowColor={MODULE_COLORS.transport.glow}
+              iconColor={MODULE_ACCENTS.transport.iconColor}
+              accentColor={MODULE_ACCENTS.transport.accentColor}
               imageUri={WebAssetIcons.quickTransport}
               onPress={() => router.push('/transport')}
             />
             <ModuleCard
               title={dict.dashboard.categories.services}
               icon="build"
-              iconColor={MODULE_COLORS.services.icon}
-              gradientColors={MODULE_COLORS.services.gradient}
-              glowColor={MODULE_COLORS.services.glow}
+              iconColor={MODULE_ACCENTS.services.iconColor}
+              accentColor={MODULE_ACCENTS.services.accentColor}
               imageUri={WebAssetIcons.quickServices}
               onPress={() => router.push('/services')}
             />
             <ModuleCard
               title={dict.dashboard.categories.realEstate}
               icon="home"
-              iconColor={MODULE_COLORS.realEstate.icon}
-              gradientColors={MODULE_COLORS.realEstate.gradient}
-              glowColor={MODULE_COLORS.realEstate.glow}
+              iconColor={MODULE_ACCENTS.realEstate.iconColor}
+              accentColor={MODULE_ACCENTS.realEstate.accentColor}
               imageUri={WebAssetIcons.quickRealEstate}
               onPress={() => router.push('/real-estate')}
             />
           </View>
         </View>
+
+        {/* 🆕 بخش «اسعار» (فاز M09 — همگام‌سازی با وب) — بلافاصله بعد از «دسترسی عاجل»، دقیقاً
+            همان جایگاهی که وب انتخاب کرده. اگر داده هنوز نرسیده/خالی باشد، خودِ کامپوننت چیزی
+            رندر نمی‌کند (rates === null || rates.length === 0)، پس هیچ فضای خالی/بخشِ شکسته‌ای
+            دیده نمی‌شود. */}
+        <ExchangeRatesSection dict={dict.exchangeRates} language={language} />
 
         {/* ردیف «تازه‌ترین استوری‌ها» — معادل دقیقِ StoriesShowcase.tsx وب.
             🛠️ اصلاح (گزارش کاربر: «بخش استوری در موبایل دیده نمی‌شود»): قبلاً وقتی هیچ استوری

@@ -1,103 +1,52 @@
-// مسیر فایل: app/transport/driver.tsx — معادل /transport/driver وب — فاز M03، تسک ۳ + تسک ۴ + تسک ۵ + تسک ۶
-// ⚠️ باگ جداگانه‌ی شناخته‌شده (ربطی به قابلیت «ولایت» ندارد — کشف‌شده حین همین بررسی):
-// saveDriverProfile (lib/transport/mutations.ts) هنوز یک فیلد imagePaths: string[] می‌فرستد،
-// اما Route واقعیِ وب (src/app/api/mobile/v1/transport/driver/route.ts) از فاز VIP به بعد به‌جای
-// آن دو فیلد جداگانه می‌خواهد: personalPhotoPath (الزامی) و vehiclePhotoPath (اختیاری) — دقیقاً
-// هم‌الگو با DriverProfileClient.tsx وب که این فرم را به دو بخشِ «عکس خودتان» / «عکس وسیله»
-// جدا کرده. یعنی این صفحه، مستقل از رفع مشکل ولایت پایین، همچنان هنگام ذخیره خطا خواهد داد —
-// چون سرور دیگر imagePaths را نمی‌شناسد. رفع این مورد نیازمند بازطراحی بخش «عکس‌ها»ی همین فرم
-// (دو دکمه‌ی انتخاب عکس جدا به‌جای گالری واحد) است و عمداً در همین تحویل انجام نشده (خارج از
-// دامنه‌ی درخواستِ «تعریف ولایت»)؛ توصیه می‌شود به‌عنوان یک تسک جداگانه پیگیری شود.
+// مسیر فایل: app/transport/driver.tsx — معادل /transport/driver وب
 //
-// فرم ثبت/ویرایش پروفایل راننده: نوع وسیله (الزامی) → مشخصات وسیله (اختیاری) → شماره تماس
-// (الزامی) → عکس‌ها (اختیاری، حداکثر ۵) → سوییچ فعال/غیرفعال (فقط در حالت ویرایش) → به‌روزرسانی
-// خودکار موقعیت مکانی (فقط وقتی سوییچ روشن است). دقیقاً معادل موبایلِ DriverProfileClient.tsx وب
-// (src/app/[lang]/transport/driver/DriverProfileClient.tsx).
+// 🛠️ بازطراحیِ کامل (فاز M09 — همگام‌سازی با وب): این فایل باگِ مستندشده‌ی مدت‌ها پیش را رفع
+// می‌کند («سیستم عکسِ آرایه‌ای قدیمی با Route واقعیِ وب هماهنگ نیست») + دو فیچرِ تازه‌ی وب را
+// اضافه می‌کند:
+//   ۱) عکس‌ها: «حداکثر ۵ عکسِ عمومی» با دو اسلاتِ معنادار جایگزین شد — عکسِ خودِ راننده
+//      (personalPhoto، الزامی) و عکسِ وسیله (vehiclePhoto، اختیاری)، دقیقاً هم‌الگو با
+//      DriverProfileClient.tsx وب. هر اسلات هم می‌تواند «از قبل موجود» (حالتِ ویرایش، مسیرِ
+//      خامِ Storage) یا «تازه‌ی همینجلسه» (URI محلی، هنوز آپلودنشده) باشد.
+//   ۲) ویدئوی کوتاهِ اختیاری، فقط برای کاربرِ VIP — با lib/media/videoUpload.ts (بدون
+//      فشرده‌سازیِ سمتِ کلاینت، رجوع کنید به یادداشتِ کاملِ همان فایل).
+//   ۳) بررسیِ «آیا بخشِ راننده و بار اکنون فعال است؟» (useTransportModuleEnabled) — اگر ادمین
+//      این بخش را از پنل خاموش کرده، کلِ فرم جایش را به TransportDisabledNotice می‌دهد، دقیقاً
+//      هم‌رفتار با صفحه‌ی transport/page.tsx وب.
 //
-// برخلاف ویزارد ثبت آگهی کالا (app/listings/new.tsx)، این یک فرم تک‌صفحه‌ای است (Wizard.tsx
-// عمداً استفاده نشده) — دقیقاً هم‌الگو با نسخه‌ی وب که خودش هم یک فرم تک‌صفحه با چند بخش است، نه
-// یک ویزارد چندمرحله‌ای؛ کلیدهای دیکشنری dict.transport.driverProfile هم فاقد
-// step1Title..step4Title اند (برخلاف dict.marketplace.wizard)، که همین انتخاب طراحی را تایید
-// می‌کند. هیچ کلید دیکشنری تازه‌ای برای تسک‌های ۳/۴/۵ لازم نبود — dict.transport.driverProfile از
-// قبل، از فاز M00 (تسک ۵، کپی مستقیم از وب)، کامل بود؛ کلیدهای مربوط به همان تسک‌ها
-// (locationTrackingActiveNotice/DeniedNotice/UnsupportedNotice، errors.invalidLocation) هم از
-// همان کپی اولیه از قبل موجود بودند و تا آن‌موقع هرگز واقعاً مصرف نشده بودند.
-//
-// جریان عکس دقیقاً هم‌الگو با app/listings/new.tsx (گام ۲ ویزارد کالا): انتخاب از گالری →
-// فشرده‌سازی فوری سمت کلاینت (lib/imageCompression.ts) → پیش‌نمایش محلی؛ آپلود واقعی
-// (lib/transport/mutations.ts :: uploadDriverImages) فقط لحظه‌ی ذخیره‌ی نهایی فرم انجام می‌شود.
-// تفاوت با کالا: اینجا هم عکس‌های «از قبل موجود» (حالت ویرایش، مسیر خامِ Storage) و هم عکس‌های
-// «تازه‌ی همین جلسه» (URI محلی) باید هم‌زمان مدیریت شوند — دقیقاً همان دو-آرایه‌ای که
-// DriverProfileClient.tsx وب هم دارد (existingImages/newImages)، چون فقط عکس‌های تازه نیاز به
-// فشرده‌سازی/آپلود دارند؛ عکس‌های قبلی همان مسیر خامشان مستقیماً دوباره ارسال می‌شود.
-//
-// بخش سوییچ فعال/غیرفعال (تسک ۴): دقیقاً هم‌الگو با بخش متناظر در DriverProfileClient.tsx
-// وب — فقط در «حالت ویرایش» نمایش داده می‌شود (راننده‌ای که هنوز پروفایلی نساخته چیزی برای
-// فعال/غیرفعال‌کردن ندارد؛ به‌جایش همان کارت inactiveByDefaultNotice قبلی نمایش داده می‌شود).
-// به‌روزرسانی «خوش‌بینانه» (optimistic): مقدار سوییچ فوراً روی صفحه تغییر می‌کند، سپس درخواست به
-// سرور می‌رود؛ در صورت شکست، مقدار قبلی برگردانده می‌شود و پیام خطا نشان داده می‌شود — دقیقاً
-// همان الگوی handleToggleActive وب. این عملیات یک اکشن کاملاً مجزا از ذخیره‌ی فرم است
-// (setDriverActiveStatus، نه saveDriverProfile) — طبق کامنت بالای همان تابع در mutations.ts.
-//
-// به‌روزرسانی خودکار موقعیت مکانی (تسک ۵): دقیقاً هم‌الگو با useEffect ردیابی موقعیت در
-// DriverProfileClient.tsx وب — تا وقتی سوییچ بالا «فعال» است، هر ۳۰ تا ۶۰ ثانیه‌ی *تصادفی*
-// (`30 + Math.random() * 30`، همان بازه‌ی دقیقِ وب — تصادفی بودن عمداً است تا اگر چند راننده
-// هم‌زمان فعال شوند، درخواست‌هایشان روی سرور یکجا خرد نشوند) مختصات فعلی گرفته و از طریق
-// updateDriverLocation (lib/transport/mutations.ts) ارسال می‌شود. تفاوت با وب فقط در دو API
-// سطح پلتفرم است:
-//   ۱) به‌جای navigator.geolocation.getCurrentPosition از expo-location (Location.getCurrentPositionAsync
-//      + مجوز از طریق requestLocationAccess مشترک، تسک ۶) استفاده شده — به‌همراه همان محافظ
-//      withTimeout ۸ ثانیه‌ای (LOCATION_TIMEOUT_MS) در برابر باگ شناخته‌شده‌ی expo-location روی
-//      برخی گوشی‌های اندرویدی (getCurrentPositionAsync گاهی برای همیشه معلق می‌ماند) — دقیقاً
-//      همان الگوی app/(tabs)/listings.tsx و app/(tabs)/transport.tsx.
-//   ۲) به‌جای document.visibilitychange (تشخیص «آیا تب مرورگر در دید کاربر است») از AppState
-//      ری‌اکت‌نیتیو (تشخیص «آیا اپ در پیش‌زمینه است») استفاده شده — معادل دقیق native همان مفهوم.
-// ردیابی دقیقاً به چرخه‌ی عمر همین کامپوننت/صفحه گره خورده (نه یک Task پس‌زمینه‌ی جدا از اپ) —
-// وقتی کاربر از این صفحه خارج شود (مثلاً بعد از ثبت فرم، router.replace به تب حمل‌ونقل)، useEffect
-// پاک‌سازی می‌شود و ارسال موقعیت متوقف می‌شود؛ این دقیقاً همان طراحی‌ای است که خودِ وب هم دارد
-// (وابسته به باز بودن تب) و با Cron موجود سرور (`/api/cron/deactivate-stale-drivers`، هر ۵ دقیقه،
-// غیرفعال‌سازی خودکار پس از ۱۰ دقیقه بدون به‌روزرسانی — تسک ۷ فاز ۰۳ وب) هماهنگ است.
-//
-// **به‌روزرسانی تسک ۶ فاز M03 (مدیریت مجوز GPS اندروید — درخواست صریح + پیام راهنما در صورت رد):**
-// نسخه‌ی قبلی sendLocation دو تماس جدا داشت: یک بررسی دستی hasServicesEnabledAsync، سپس یک
-// requestForegroundPermissionsAsync ساده که فقط status را می‌خواند و هر رد شدنی را یکسان
-// LocationTrackingStatus='denied' می‌گذاشت — یعنی حتی اگر کاربر مجوز را با «دیگر نشان نده» برای
-// همیشه رد کرده بود (canAskAgain=false)، اپ هر ۳۰ تا ۶۰ ثانیه بی‌صدا دوباره تلاش می‌کرد و همان
-// پیام عمومی locationTrackingDeniedNotice (که حتی اشتباهاً از «تنظیمات مرورگر» وب کپی شده بود) را
-// تکرار می‌کرد — راننده هیچ‌وقت واقعاً «دیده‌شدن» را دوباره به دست نمی‌آورد، بدون این‌که هیچ راهنمایی
-// عملی ببیند. رفع شد: هر دو بررسی (سرویس GPS گوشی + مجوز اپ، با تفکیک deniedRetry/deniedBlocked)
-// اکنون در یک تابع مشترک، requestLocationAccess (lib/location.ts، تازه — همان‌جایی که
-// app/(tabs)/transport.tsx هم استفاده می‌کند)، متمرکز شده. LocationTrackingStatus یک عضو تازه
-// گرفت: 'blocked' — فقط در همین حالت (که تلاش خودکار هرگز به نتیجه نمی‌رسد) یک دکمه‌ی «باز کردن
-// تنظیمات گوشی» (Linking.openSettings()) کنار پیام راهنمای تازه (locationTrackingBlockedNotice)
-// نمایش داده می‌شود؛ حالت 'denied' (رد قابل‌تکرار) هم‌چنان بدون دکمه می‌ماند، چون تلاش خودکار
-// چرخه‌ی بعدی خودش دوباره پنجره‌ی سیستمی را باز می‌کند و نیازی به مداخله‌ی دستی کاربر نیست. متن
-// locationTrackingDeniedNotice هم اصلاح شد تا دیگر به «تنظیمات مرورگر» اشاره نکند.
+// بقیه‌ی رفتار (نوع وسیله، ولایت، شماره تماس، سوییچ فعال/غیرفعال، ردیابیِ خودکارِ موقعیت با
+// فاصله‌ی تصادفیِ ۳۰-۶۰ ثانیه) کاملاً دست‌نخورده ماند — این‌ها بخشی از این بازطراحی نبودند.
 import { LoginRequiredCard } from '@/components/LoginRequiredCard';
 import { ProvinceSelectField } from '@/components/province/ProvinceSelectField';
+import { TransportDisabledNotice } from '@/components/transport/TransportDisabledNotice';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CategoryPicker } from '@/components/ui/CategoryPicker';
+import { Icons } from '@/components/ui/Icons';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/components/ui/Toast';
+import { VipUpsellNotice } from '@/components/vip/VipUpsellNotice';
 import { Colors, Fonts, Radii, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useDictionary } from '@/hooks/useDictionary';
 import { compressImage } from '@/lib/imageCompression';
 import { requestLocationAccess } from '@/lib/location';
+import { pickAndValidateVideo, VideoPickError } from '@/lib/media/videoUpload';
 import { normalizeAfghanPhone } from '@/lib/phone';
 import { getDriverImageUrl } from '@/lib/transport/images';
+import { useTransportModuleEnabled } from '@/lib/transport/moduleStatus';
 import {
   getMyDriverProfile,
   saveDriverProfile,
   setDriverActiveStatus,
   TransportApiError,
   updateDriverLocation,
-  uploadDriverImages,
+  uploadDriverPhoto,
+  uploadDriverVideo,
 } from '@/lib/transport/mutations';
 import { VEHICLE_TYPES, VehicleTypeId } from '@/lib/transport/vehicleTypes';
+import { isUserVip } from '@/lib/vip/vipStatus';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -115,8 +64,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const MAX_PHOTOS = 5;
-
 // دقیقاً همان محافظِ به‌کاررفته در app/(tabs)/listings.tsx و app/(tabs)/transport.tsx — طبق باگ
 // شناخته‌شده‌ی expo-location روی برخی گوشی‌های اندرویدی (getCurrentPositionAsync گاهی برای همیشه
 // معلق می‌ماند).
@@ -129,16 +76,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]);
 }
 
-// تسک ۵ — پنج وضعیت ممکنِ ردیابی موقعیت (چهارتای قبلی + 'blocked' تازه‌ی تسک ۶):
-//   'idle'        → سوییچ فعال/غیرفعال هنوز روشن نشده، ردیابی اصلاً شروع نشده.
-//   'active'      → آخرین تلاش موفق بود؛ موقعیت با موفقیت ارسال شد.
-//   'denied'      → کاربر مجوز را رد کرده ولی هنوز می‌توان دوباره از او پرسید (deniedRetry) —
-//                   چرخه‌ی بعدی خودش دوباره پنجره‌ی سیستمی را نشان می‌دهد، نیازی به دکمه نیست.
-//   'blocked'     → کاربر با «دیگر نشان نده» مجوز را برای همیشه رد کرده (deniedBlocked، تازه‌ی
-//                   تسک ۶) — تلاش خودکار دیگر هیچ‌وقت به‌جایی نمی‌رسد؛ فقط دکمه‌ی «باز کردن
-//                   تنظیمات گوشی» راه‌حل واقعی است.
-//   'unsupported' → سرویس موقعیت مکانی (GPS) کلِ گوشی خاموش است.
 type LocationTrackingStatus = 'idle' | 'active' | 'denied' | 'blocked' | 'unsupported';
+
+// یک اسلاتِ عکسِ تکی (شخصی یا وسیله) — یا «از قبل موجود» (مسیرِ خامِ Storage، حالتِ ویرایش) یا
+// «تازه‌ی همین‌جلسه» (URI محلی، هنوز آپلودنشده) یا خالی.
+type PhotoSlot = { kind: 'existing'; path: string } | { kind: 'new'; uri: string } | null;
 
 export default function DriverProfileScreen() {
   const dict = useDictionary();
@@ -147,34 +89,32 @@ export default function DriverProfileScreen() {
   const vehicleTypesDict = dict.transport.vehicleTypes as Record<string, string>;
   const router = useRouter();
   const { user, isReady } = useAuth();
-  // 🛠️ اصلاح UX (سراسری — رجوع کنید به یادداشت کامل در app/listings/[id].tsx): جلوگیری از
-  // پنهان‌شدنِ آخرین آیتمِ صفحه زیرِ نوار ناوبریِ سیستمیِ اندروید.
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
 
-  // تا وقتی پروفایل فعلی (اگر باشد) خوانده نشده، فرم رندر نمی‌شود — تا فیلدها یک‌بار درست
-  // پیش‌پر شوند، نه این‌که خالی نمایش داده شوند و بعد ناگهان مقداردهی شوند.
+  // 🆕 فاز M09 — undefined = هنوز در حالِ بررسی، false = ادمین خاموش کرده.
+  const moduleEnabled = useTransportModuleEnabled();
+
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
 
   const [vehicleType, setVehicleType] = useState<VehicleTypeId | null>(null);
-  // فاز ۱۰ موبایل — قابلیت «ولایت»: فیلد الزامی تازه.
   const [province, setProvince] = useState<string | null>(null);
   const [vehicleDetails, setVehicleDetails] = useState('');
   const [contactPhone, setContactPhone] = useState('');
 
-  // عکس‌های از قبل ذخیره‌شده (حالت ویرایش) — مسیر خامِ Storage.
-  const [existingImages, setExistingImages] = useState<string[]>([]);
-  // عکس‌های تازه‌ی انتخاب‌شده در همین جلسه — URI محلی؛ فقط هنگام ذخیره‌ی فرم آپلود می‌شوند.
-  const [newImages, setNewImages] = useState<string[]>([]);
-  const [compressingCount, setCompressingCount] = useState(0);
+  // 🆕 فاز M09 — دو اسلاتِ معنادارِ عکس به‌جای آرایه‌ی عمومیِ قبلی.
+  const [personalPhoto, setPersonalPhoto] = useState<PhotoSlot>(null);
+  const [vehiclePhoto, setVehiclePhoto] = useState<PhotoSlot>(null);
+  const [compressingPersonal, setCompressingPersonal] = useState(false);
+  const [compressingVehicle, setCompressingVehicle] = useState(false);
 
-  // وضعیت فعال/غیرفعال — تسک ۴. فقط در حالت ویرایش معنا دارد (پیش‌فرض false بی‌اثر است، چون
-  // بخش سوییچ فقط وقتی isEditMode=true رندر می‌شود).
+  // 🆕 فاز M09 — ویدئوی کوتاهِ اختیاری، فقط VIP.
+  const [videoSlot, setVideoSlot] = useState<PhotoSlot>(null);
+
   const [isActive, setIsActive] = useState(false);
   const [togglingActive, setTogglingActive] = useState(false);
 
-  // ردیابی خودکار موقعیت مکانی — تسک ۵ (+ حالت 'blocked' تسک ۶). فقط وقتی isActive=true معنا دارد.
   const [locationTrackingStatus, setLocationTrackingStatus] =
     useState<LocationTrackingStatus>('idle');
 
@@ -182,7 +122,7 @@ export default function DriverProfileScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const totalImages = existingImages.length + newImages.length;
+  const isVip = isUserVip(user?.vipExpiresAt);
 
   useEffect(() => {
     if (!isReady) return;
@@ -204,16 +144,15 @@ export default function DriverProfileScreen() {
           setProvince(profile.province);
           setVehicleDetails(profile.vehicleDetails ?? '');
           setContactPhone(profile.contactPhone);
-          setExistingImages(profile.images);
+          if (profile.personalPhotoPath) setPersonalPhoto({ kind: 'existing', path: profile.personalPhotoPath });
+          if (profile.vehiclePhotoPath) setVehiclePhoto({ kind: 'existing', path: profile.vehiclePhotoPath });
+          if (profile.videoPath) setVideoSlot({ kind: 'existing', path: profile.videoPath });
           setIsActive(profile.isActive);
         } else {
           setContactPhone(user.phoneNumber);
         }
       })
       .catch(() => {
-        // شبکه/سرور در دسترس نبود — فرم در «حالت ثبت» با شماره‌ی پیش‌فرض کاربر باز می‌ماند؛
-        // کاربر همچنان می‌تواند فرم را پر و ارسال کند (خطای واقعی همان لحظه‌ی ارسال نشان داده
-        // می‌شود، دقیقاً هم‌روحیه با رفتار تحمل‌گر AuthContext.refreshUser).
         if (!cancelled) setContactPhone(user.phoneNumber);
       })
       .finally(() => {
@@ -225,10 +164,8 @@ export default function DriverProfileScreen() {
     };
   }, [isReady, user]);
 
-  // تسک ۵ — تا وقتی سوییچ بالا «فعال» است، هر ۳۰ تا ۶۰ ثانیه‌ی تصادفی مختصات فعلی گرفته و ارسال
-  // می‌شود؛ دقیقاً هم‌الگو با useEffect ردیابی موقعیت در DriverProfileClient.tsx وب (جزئیات کامل
-  // در کامنت بالای فایل). تسک ۶ — بررسی سرویس GPS + مجوز اپ اکنون یک‌جا از طریق requestLocationAccess
-  // مشترک انجام می‌شود، به‌جای دو تماس جداگانه‌ی قبلی.
+  // ردیابیِ خودکارِ موقعیتِ مکانی — دست‌نخورده از نسخه‌ی قبلی، رجوع کنید به یادداشتِ کاملِ بالای
+  // خودِ این افکت در نسخه‌های پیشین همین فایل.
   useEffect(() => {
     if (!isActive) {
       setLocationTrackingStatus('idle');
@@ -248,9 +185,6 @@ export default function DriverProfileScreen() {
         return;
       }
       if (access === 'deniedBlocked') {
-        // تسک ۶ — رد همیشگی: تلاش خودکار بعدی هم بی‌فایده است، ولی چرخه هم‌چنان زمان‌بندی
-        // می‌شود تا اگر کاربر خودش از تنظیمات گوشی مجوز را فعال کرد، بدون نیاز به خروج/ورود
-        // دوباره از این صفحه، ردیابی خودش به‌طور طبیعی در چرخه‌ی بعدی از سر گرفته شود.
         setLocationTrackingStatus('blocked');
         scheduleNext();
         return;
@@ -262,26 +196,12 @@ export default function DriverProfileScreen() {
       }
 
       try {
-        // فاز M07، تسک ۴ — بازبینی مصرف باتری: دقت صریحاً روی Balanced تنظیم شد (نه پیش‌فرض
-        // ضمنی قبلی، که هم‌ارزِ همین مقدار بود، ولی صریح‌نویسی آن را از تغییر ناخواسته‌ی احتمالی
-        // در نسخه‌های بعدیِ expo-location مصون نگه می‌دارد). برای این مورد استفاده — فقط نمایش
-        // موقعیت تقریبیِ راننده روی فهرست، نه ناوبری نوبت‌به‌نوبت — دقت بالاتر (High/Highest،
-        // ~۱۰ برابر مصرف باتری بیشتر روی GPS سخت‌افزاری) هیچ سودی برای کاربر ندارد؛ Balanced
-        // (دقت ~۱۰۰ متر، معمولاً از رادیوی شبکه/Wi-Fi به‌جای GPS ماهواره‌ای استفاده می‌کند) دقیقاً
-        // کافی است. این تنظیم، در کنار سه تصمیم معماریِ از قبلِ این فایل که مستقیماً به مصرف
-        // باتری کمک می‌کنند، بازبینی و تایید شد: (۱) Polling با فاصله‌ی تصادفی ۳۰-۶۰ ثانیه، نه
-        // watchPositionAsync پیوسته؛ (۲) توقف کامل هنگام پس‌زمینه‌بودن اپ (AppState)؛
-        // (۳) توقف کامل وقتی سوییچ «فعال» خاموش است (کل این افکت فقط وقتی isActive===true
-        // نصب می‌شود). اندازه‌گیری واقعی درصد افت باتری روی دستگاه فیزیکی، بخشی از تسک ۵ همین
-        // فاز است.
         const position = await withTimeout(
           Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
           LOCATION_TIMEOUT_MS
         );
         if (cancelled) return;
         setLocationTrackingStatus('active');
-        // fire-and-forget — دقیقاً هم‌رفتار وب: یک شکست تکی نباید تجربه‌ی کاربر را با Toast خطا
-        // مختل کند، چرخه‌ی بعدی خودش دوباره تلاش می‌کند (کامنت کامل بالای updateDriverLocation).
         updateDriverLocation(position.coords.latitude, position.coords.longitude).catch(() => {});
       } catch {
         if (cancelled) return;
@@ -293,8 +213,6 @@ export default function DriverProfileScreen() {
     function sendIfForeground() {
       if (cancelled) return;
       if (AppState.currentState !== 'active') {
-        // اپ در پس‌زمینه است — همین چرخه را رد کن و دوباره در نوبت بعدی امتحان کن؛ معادل دقیقِ
-        // بررسی document.visibilityState === 'hidden' در وب.
         scheduleNext();
         return;
       }
@@ -324,11 +242,22 @@ export default function DriverProfileScreen() {
     };
   }, [isActive]);
 
-  if (!isReady || (user && loadingProfile)) {
+  // 🆕 فاز M09 — تا وقتی وضعیتِ ماژول معلوم نشده، چیزی نشان نده؛ اگر خاموش است، کلِ فرم را با
+  // اخطار جایگزین کن.
+  if (moduleEnabled === undefined || !isReady || (user && loadingProfile)) {
     return (
       <View style={styles.centered}>
         <Spinner size="large" />
       </View>
+    );
+  }
+
+  if (!moduleEnabled) {
+    return (
+      <>
+        <Stack.Screen options={{ title: formDict.title }} />
+        <TransportDisabledNotice dict={dict.transport.disabledNotice} />
+      </>
     );
   }
 
@@ -345,58 +274,75 @@ export default function DriverProfileScreen() {
     );
   }
 
-  const addPhotos = async () => {
-    const remaining = MAX_PHOTOS - totalImages;
-    if (remaining <= 0) return;
-
+  async function pickPhoto(slot: 'personal' | 'vehicle') {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return; // رد دسترسی گالری بدون توضیح مسدودکننده؛ کاربر می‌تواند دوباره تلاش کند
+    if (!permission.granted) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
       quality: 1,
     });
-    if (result.canceled) return;
+    if (result.canceled || result.assets.length === 0) return;
 
-    setCompressingCount((c) => c + result.assets.length);
-    for (const asset of result.assets) {
-      try {
-        const compressed = await compressImage(asset.uri);
-        setNewImages((prev) =>
-          existingImages.length + prev.length < MAX_PHOTOS ? [...prev, compressed.uri] : prev
-        );
-      } catch {
-        showToast(errorsDict.compressionFailed, 'error');
-      } finally {
-        setCompressingCount((c) => c - 1);
-      }
+    const setCompressing = slot === 'personal' ? setCompressingPersonal : setCompressingVehicle;
+    const setSlot = slot === 'personal' ? setPersonalPhoto : setVehiclePhoto;
+
+    setCompressing(true);
+    try {
+      const compressed = await compressImage(result.assets[0].uri);
+      setSlot({ kind: 'new', uri: compressed.uri });
+    } catch {
+      showToast(errorsDict.compressionFailed ?? errorsDict.generic, 'error');
+    } finally {
+      setCompressing(false);
     }
-  };
+  }
 
-  const removeExistingImage = (path: string) =>
-    setExistingImages((prev) => prev.filter((p) => p !== path));
-  const removeNewImage = (uri: string) => setNewImages((prev) => prev.filter((u) => u !== uri));
+  async function pickVideo() {
+    try {
+      const picked = await pickAndValidateVideo();
+      if (!picked) return;
+      setVideoSlot({ kind: 'new', uri: picked.uri });
+    } catch (err) {
+      const code = err instanceof VideoPickError ? err.code : 'generic';
+      showToast(errorsDict[code] ?? errorsDict.generic, 'error');
+    }
+  }
 
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!vehicleType) errs.vehicleType = errorsDict.invalidVehicleType;
-    // فاز ۱۰ موبایل — قابلیت «ولایت»: saveDriverProfileAction وب این فیلد را الزامی می‌داند
-    // (رجوع کنید به کامنت بالای lib/transport/mutations.ts).
     if (!province) errs.province = dict.province.fieldError;
     if (!normalizeAfghanPhone(contactPhone)) errs.phone = errorsDict.invalidPhone;
+    if (!personalPhoto) errs.personalPhoto = errorsDict.personalPhotoRequired;
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!validate() || !vehicleType || !province) return;
+    if (!validate() || !vehicleType || !province || !personalPhoto) return;
 
     setSubmitError(null);
     setSubmitting(true);
     try {
-      const uploadedPaths = await uploadDriverImages(newImages);
+      const personalPhotoPath =
+        personalPhoto.kind === 'existing' ? personalPhoto.path : await uploadDriverPhoto(personalPhoto.uri, 'personal');
+
+      const vehiclePhotoPath = vehiclePhoto
+        ? vehiclePhoto.kind === 'existing'
+          ? vehiclePhoto.path
+          : await uploadDriverPhoto(vehiclePhoto.uri, 'vehicle')
+        : null;
+
+      // 🆕 فاز M09 — ویدئو فقط اگر کاربر واقعاً VIP است ارسال می‌شود؛ حتی اگر UI به‌هردلیل یک
+      // اسلاتِ videoSlot باقی‌مانده از حالتِ VIP قبلی داشته باشد، دفاع در عمقِ سمتِ کلاینت.
+      const videoPath =
+        isVip && videoSlot
+          ? videoSlot.kind === 'existing'
+            ? videoSlot.path
+            : await uploadDriverVideo(videoSlot.uri)
+          : null;
+
       const normalizedPhone = normalizeAfghanPhone(contactPhone)!; // validate() همین را تضمین کرده
 
       await saveDriverProfile({
@@ -404,7 +350,9 @@ export default function DriverProfileScreen() {
         province,
         vehicleDetails: vehicleDetails.trim(),
         contactPhone: normalizedPhone,
-        imagePaths: [...existingImages, ...uploadedPaths],
+        personalPhotoPath,
+        vehiclePhotoPath,
+        videoPath,
       });
 
       showToast(isEditMode ? formDict.saveSuccessUpdate : formDict.saveSuccessCreate, 'success');
@@ -417,9 +365,6 @@ export default function DriverProfileScreen() {
     }
   };
 
-  // سوییچ فعال/غیرفعال — تسک ۴. به‌روزرسانی خوش‌بینانه: مقدار فوراً روی صفحه عوض می‌شود؛ در
-  // صورت شکست درخواست، به مقدار قبلی برمی‌گردد و پیام خطا نشان داده می‌شود — دقیقاً هم‌الگو با
-  // handleToggleActive در DriverProfileClient.tsx وب.
   const handleToggleActive = async (nextValue: boolean) => {
     const previousValue = isActive;
     setIsActive(nextValue);
@@ -438,6 +383,11 @@ export default function DriverProfileScreen() {
       setTogglingActive(false);
     }
   };
+
+  function photoUri(slot: PhotoSlot): string | null {
+    if (!slot) return null;
+    return slot.kind === 'existing' ? getDriverImageUrl(slot.path) : slot.uri;
+  }
 
   return (
     <>
@@ -479,49 +429,67 @@ export default function DriverProfileScreen() {
           />
         </Card>
 
+        {/* 🆕 فاز M09 — عکسِ شخصی، الزامی. */}
         <Text style={styles.sectionTitle}>{formDict.photosSectionTitle}</Text>
-        <Text style={styles.stepHint}>{formDict.photosHint}</Text>
-        <View style={styles.photoGrid}>
-          {existingImages.map((path) => (
-            <View key={`existing-${path}`} style={styles.photoWrap}>
-              <Image source={{ uri: getDriverImageUrl(path) }} style={styles.photo} contentFit="cover" />
-              <Pressable
-                onPress={() => removeExistingImage(path)}
-                accessibilityLabel={formDict.removePhotoLabel}
-                style={styles.removeBadge}>
-                <Text style={styles.removeBadgeText}>×</Text>
-              </Pressable>
+        <Card style={styles.card}>
+          <View style={styles.photoSlotHeader}>
+            <Text style={styles.photoSlotLabel}>{formDict.personalPhotoLabel}</Text>
+            <View style={styles.requiredBadge}>
+              <Text style={styles.requiredBadgeText}>{formDict.requiredBadge}</Text>
             </View>
-          ))}
-          {newImages.map((uri) => (
-            <View key={`new-${uri}`} style={styles.photoWrap}>
-              <Image source={{ uri }} style={styles.photo} contentFit="cover" />
-              <Pressable
-                onPress={() => removeNewImage(uri)}
-                accessibilityLabel={formDict.removePhotoLabel}
-                style={styles.removeBadge}>
-                <Text style={styles.removeBadgeText}>×</Text>
-              </Pressable>
-            </View>
-          ))}
-          {compressingCount > 0 &&
-            Array.from({ length: compressingCount }).map((_, i) => (
-              <View key={`compressing-${i}`} style={[styles.photoWrap, styles.photoLoading]}>
-                <Spinner size="small" />
-              </View>
-            ))}
-        </View>
-        {totalImages < MAX_PHOTOS && (
-          <Button
-            title={formDict.addPhotoButton}
-            variant="secondary"
-            onPress={addPhotos}
-            style={styles.addPhotoButton}
+          </View>
+          <PhotoSlotView
+            uri={photoUri(personalPhoto)}
+            isCompressing={compressingPersonal}
+            onPick={() => pickPhoto('personal')}
+            onRemove={() => setPersonalPhoto(null)}
+            addButtonLabel={formDict.addPersonalPhotoButton}
+            removeLabel={formDict.removePhotoLabel}
           />
+          {fieldErrors.personalPhoto && <Text style={styles.fieldError}>{fieldErrors.personalPhoto}</Text>}
+
+          <View style={styles.photoSlotHeader}>
+            <Text style={styles.photoSlotLabel}>{formDict.vehiclePhotoLabel}</Text>
+            <View style={styles.optionalBadge}>
+              <Text style={styles.optionalBadgeText}>{formDict.optionalBadge}</Text>
+            </View>
+          </View>
+          <PhotoSlotView
+            uri={photoUri(vehiclePhoto)}
+            isCompressing={compressingVehicle}
+            onPick={() => pickPhoto('vehicle')}
+            onRemove={() => setVehiclePhoto(null)}
+            addButtonLabel={formDict.addVehiclePhotoButton}
+            removeLabel={formDict.removePhotoLabel}
+          />
+
+          <Text style={styles.photosHint}>{formDict.photosHint}</Text>
+        </Card>
+
+        {/* 🆕 فاز M09 — ویدئوی کوتاهِ اختیاری، فقط VIP. */}
+        <Text style={styles.sectionTitle}>{formDict.videoSectionTitle}</Text>
+        {!isVip ? (
+          <VipUpsellNotice message={dict.vip.upsell.videoMessage} buttonLabel={dict.vip.upsell.button} />
+        ) : (
+          <Card style={styles.card}>
+            {videoSlot ? (
+              <View style={styles.videoPreviewWrap}>
+                <View style={styles.videoPreviewPlaceholder}>
+                  <Icons.CheckCircle size={22} color={Colors.primary} />
+                </View>
+                <Pressable
+                  onPress={() => setVideoSlot(null)}
+                  accessibilityLabel={formDict.removeVideoLabel}
+                  style={styles.removeBadge}>
+                  <Text style={styles.removeBadgeText}>×</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Button title={formDict.addVideoButton} variant="secondary" onPress={pickVideo} />
+            )}
+          </Card>
         )}
 
-        {/* سوییچ فعال/غیرفعال (تسک ۴) + وضعیت ردیابی موقعیت (تسک ۵ + حالت 'blocked' تسک ۶) — فقط
-            در حالت ویرایش (راننده‌ای که هنوز پروفایل نساخته چیزی برای فعال/غیرفعال‌کردن ندارد). */}
         {isEditMode && (
           <Card style={styles.card}>
             <View style={styles.switchRow}>
@@ -547,8 +515,6 @@ export default function DriverProfileScreen() {
                 {formDict.locationTrackingDeniedNotice}
               </Text>
             )}
-            {/* تسک ۶ — حالت تازه‌ی «رد همیشگی»: بدون دکمه‌ی راهنما، تلاش خودکار هرگز به نتیجه
-                نمی‌رسد؛ برخلاف حالت بالا (denied)، اینجا یک دکمه‌ی عملی هم نمایش داده می‌شود. */}
             {isActive && locationTrackingStatus === 'blocked' && (
               <View style={styles.locationBlockedWrap}>
                 <Text style={styles.locationNoticeDanger}>
@@ -586,12 +552,49 @@ export default function DriverProfileScreen() {
                 : formDict.submitButtonCreate
           }
           onPress={handleSubmit}
-          disabled={submitting || compressingCount > 0}
+          disabled={submitting || compressingPersonal || compressingVehicle}
           style={styles.submitButton}
         />
       </ScrollView>
     </>
   );
+}
+
+// 🆕 فاز M09 — یک اسلاتِ عکسِ تکی (پیش‌نمایش/دکمه‌ی افزودن/نشانِ حذف)، مشترک بینِ شخصی/وسیله —
+// به‌جای تکرارِ همین JSX دوبار.
+function PhotoSlotView({
+  uri,
+  isCompressing,
+  onPick,
+  onRemove,
+  addButtonLabel,
+  removeLabel,
+}: {
+  uri: string | null;
+  isCompressing: boolean;
+  onPick: () => void;
+  onRemove: () => void;
+  addButtonLabel: string;
+  removeLabel: string;
+}) {
+  if (isCompressing) {
+    return (
+      <View style={[styles.photoWrap, styles.photoLoading]}>
+        <Spinner size="small" />
+      </View>
+    );
+  }
+  if (uri) {
+    return (
+      <View style={styles.photoWrap}>
+        <Image source={{ uri }} style={styles.photo} contentFit="cover" />
+        <Pressable onPress={onRemove} accessibilityLabel={removeLabel} style={styles.removeBadge}>
+          <Text style={styles.removeBadgeText}>×</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return <Button title={addButtonLabel} variant="secondary" onPress={onPick} style={styles.addPhotoButton} />;
 }
 
 const styles = StyleSheet.create({
@@ -622,13 +625,6 @@ const styles = StyleSheet.create({
     color: Colors.textMain,
     textAlign: 'center',
   },
-  stepHint: {
-    fontSize: 13,
-    fontFamily: Fonts.regular,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: -Spacing.xs,
-  },
   fieldError: {
     fontSize: 12,
     fontFamily: Fonts.regular,
@@ -638,14 +634,48 @@ const styles = StyleSheet.create({
   card: {
     gap: Spacing.md,
   },
-  photoGrid: {
+  // 🆕 فاز M09
+  photoSlotHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  photoSlotLabel: {
+    fontSize: 13,
+    fontFamily: Fonts.bold,
+    color: Colors.textMain,
+  },
+  requiredBadge: {
+    borderRadius: Radii.full,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  requiredBadgeText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bold,
+    color: Colors.danger,
+  },
+  optionalBadge: {
+    borderRadius: Radii.full,
+    backgroundColor: Colors.bgBase,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+  },
+  optionalBadgeText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.bold,
+    color: Colors.textMuted,
+  },
+  photosHint: {
+    fontSize: 12,
+    fontFamily: Fonts.regular,
+    color: Colors.textMuted,
+    lineHeight: 18,
   },
   photoWrap: {
-    width: 88,
-    height: 88,
+    width: 96,
+    height: 96,
     borderRadius: Radii.md,
     overflow: 'hidden',
   },
@@ -677,6 +707,22 @@ const styles = StyleSheet.create({
   addPhotoButton: {
     marginTop: -Spacing.xs,
   },
+  // 🆕 فاز M09 — پیش‌نمایشِ ویدئو. RN فاقدِ تگِ <video> بومی است؛ به‌جای نصبِ expo-av فقط برای
+  // یک پیش‌نمایشِ کوچک، یک نشانگرِ ساده‌ی «ویدئو انتخاب شد» نمایش داده می‌شود — پخشِ واقعی لازم
+  // نیست، چون هدف در همین مرحله فقط تاییدِ انتخاب و امکانِ حذف است.
+  videoPreviewWrap: {
+    width: 120,
+    height: 90,
+    borderRadius: Radii.md,
+    overflow: 'hidden',
+  },
+  videoPreviewPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(6,182,212,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -698,7 +744,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     lineHeight: 18,
   },
-  // تسک ۵ — نمایش وضعیت ردیابی موقعیت زیر سوییچ، دقیقاً هم‌الگو با متن‌های مشابه بالا.
   locationNotice: {
     fontSize: 12,
     fontFamily: Fonts.regular,
@@ -711,7 +756,6 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     lineHeight: 18,
   },
-  // تسک ۶ — پوشش پیام راهنما + دکمه‌ی «باز کردن تنظیمات» برای حالت «رد همیشگی».
   locationBlockedWrap: {
     gap: Spacing.xs,
   },

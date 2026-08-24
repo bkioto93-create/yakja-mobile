@@ -32,6 +32,8 @@ import { apiFetch } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 
 const SERVICE_PROVIDERS_BUCKET = 'service-providers-images';
+// 🆕 فاز M09
+const SERVICE_PROVIDERS_VIDEOS_BUCKET = 'service-providers-videos';
 
 /** خطای برگشتی از هر سه Route؛ code دقیقاً یکی از کلیدهای dict.services.providerProfile.errors است. */
 export class ServicesApiError extends Error {
@@ -58,6 +60,8 @@ export type MyServiceProviderProfile = {
   description: string | null;
   isActive: boolean;
   images: string[];
+  /** 🆕 فاز M09 */
+  videoPath: string | null;
 };
 
 type GetProviderProfileResponse = { success: true; profile: MyServiceProviderProfile | null };
@@ -110,6 +114,34 @@ export async function uploadProviderImages(localUris: string[]): Promise<string[
   return imagePaths;
 }
 
+/**
+ * 🆕 فاز M09 — همگام‌سازی با وب، آپلودِ ویدئوی کوتاهِ VIP. دقیقاً هم‌الگو با uploadDriverVideo
+ * (lib/transport/mutations.ts) — بدونِ فشرده‌سازی (رجوع کنید به یادداشتِ کاملِ
+ * lib/media/videoUpload.ts)، Route تکی و بدونِ بدنه.
+ */
+/** 🆕 فاز M09 — پاسخِ Route ویدئو، یک اسلاتِ تکی (نه آرایه‌ی upload-slots عکس‌ها). */
+type VideoUploadSlotResponse =
+  | { success: true; slot: { path: string; token: string } }
+  | { success: false; error: string };
+
+export async function uploadProviderVideo(localUri: string): Promise<string> {
+  const slotRes = await apiFetch('/api/mobile/v1/services/provider/video-upload-slot', {
+    method: 'POST',
+  });
+  const slotData: VideoUploadSlotResponse = await slotRes.json();
+  if (!slotData.success) throw new ServicesApiError(slotData.error);
+
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+
+  const { error } = await supabase.storage
+    .from(SERVICE_PROVIDERS_VIDEOS_BUCKET)
+    .uploadToSignedUrl(slotData.slot.path, slotData.slot.token, blob, { contentType: 'video/mp4' });
+  if (error) throw new ServicesApiError('uploadFailed');
+
+  return slotData.slot.path;
+}
+
 export type SaveServiceProviderProfilePayload = {
   serviceCategoryId: string;
   // فاز ۱۰ موبایل — قابلیت «ولایت»: فیلد الزامی تازه — saveServiceProviderProfileAction وب از
@@ -120,6 +152,8 @@ export type SaveServiceProviderProfilePayload = {
   description: string;
   /** مسیرهای خامِ Storage (عکس‌های قبلاً موجود + خروجی uploadProviderImages) — نه URL کامل. */
   imagePaths: string[];
+  /** 🆕 فاز M09 — مسیرِ خامِ Storage یا null؛ اختیاری، فقط برای کاربرِ VIP. */
+  videoPath?: string | null;
 };
 
 type SaveProviderProfileResponse = { success: true } | { success: false; error: string };

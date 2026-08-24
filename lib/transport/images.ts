@@ -10,7 +10,14 @@
 // یادداشت مهم (طبق همان درسِ باگ فاز M02): تابع Postgres get_active_drivers مسیر خام را برمی‌گرداند،
 // نه URL کامل را؛ این تبدیل باید همیشه در همین یک نقطه (lib/transport/api.ts) انجام شود، نه در
 // خودِ کامپوننت رابط کاربری — تا اگر روزی نام باکت یا الگوی URL عوض شد، فقط همین فایل تغییر کند.
+//
+// 🆕 فاز M09 — همگام‌سازی با وب (بازطراحیِ عکس‌ها + ویدئوی VIP): getDriverImageUrl همان تابعِ
+// قبلی است، دست‌نخورده — چون هم personalPhotoPath هم vehiclePhotoPath در همان باکتِ
+// drivers-images ذخیره می‌شوند (فقط پیشوندِ نامِ فایل فرق می‌کند، رجوع کنید به
+// createDriverPhotoUploadSlotAction وب)، نیازی به تابعِ جداگانه نبود. getDriverVideoUrl تازه
+// اضافه شد — باکتِ جداگانه‌ی drivers-videos.
 const DRIVERS_BUCKET = 'drivers-images';
+const DRIVERS_VIDEOS_BUCKET = 'drivers-videos';
 
 export function getDriverImageUrl(path: string): string {
   const baseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
@@ -19,4 +26,10 @@ export function getDriverImageUrl(path: string): string {
 
 export function getDriverImageUrls(paths: string[]): string[] {
   return paths.map(getDriverImageUrl);
+}
+
+/** 🆕 فاز M09 */
+export function getDriverVideoUrl(path: string): string {
+  const baseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  return `${baseUrl}/storage/v1/object/public/${DRIVERS_VIDEOS_BUCKET}/${path}`;
 }

@@ -43,6 +43,12 @@ export type AuthUser = {
   role: 'user' | 'admin';
   language: 'fa' | 'ps' | null;
   vipExpiresAt: string | null;
+  // 🆕 فاز M09 — همگام‌سازی با وب، قابلیت «آپلود عکس پروفایل»: هر دو فیلد از قبل در پاسخِ
+  // GET /api/mobile/v1/profile موجودند (رجوع کنید به یادداشتِ به‌روزرسانی‌شده‌ی بالای همان Route
+  // در ریپازیتوری وب)؛ اینجا فقط باید در تایپ هم اضافه شوند تا مقداری که از قبل در JSON می‌آید،
+  // در کل اپ موبایل هم قابل‌استفاده باشد.
+  photoPath: string | null;
+  photoStatus: 'pending' | 'approved' | 'rejected' | null;
 };
 
 type ProfileResponse = { success: boolean; user: AuthUser | null };

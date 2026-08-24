@@ -89,6 +89,7 @@
 // این فایل): افزودن `import 'react-native-url-polyfill/auto';` به ابتدای lib/supabase.ts.
 import { ReportButton } from '@/components/ReportButton';
 import { ChatButton } from '@/components/chat/ChatButton';
+import { TransportDisabledNotice } from '@/components/transport/TransportDisabledNotice';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icons } from '@/components/ui/Icons';
@@ -104,6 +105,7 @@ import { LocationAccessStatus, requestLocationAccess } from '@/lib/location';
 import { useAutoRetryOnReconnect } from '@/lib/network';
 import { supabase } from '@/lib/supabase';
 import { ActiveDriverSummary, getActiveDrivers } from '@/lib/transport/api';
+import { useTransportModuleEnabled } from '@/lib/transport/moduleStatus';
 import { VEHICLE_TYPES, VehicleTypeId } from '@/lib/transport/vehicleTypes';
 import { Image } from 'expo-image';
 import * as Location from 'expo-location';
@@ -142,6 +144,14 @@ export default function TransportScreen() {
   const { province } = useProvince();
   const { user } = useAuth();
   const router = useRouter();
+
+  // 🆕 فاز M09 — همگام‌سازی با وب، «غیرفعال‌سازی موقت بخش راننده و بار»: undefined = هنوز در
+  // حالِ بررسی، false = ادمین از پنل خاموش کرده. تمام Hookهای دیگرِ این کامپوننت (فهرست، GPS،
+  // جستجو، Realtime) دست‌نخورده و بی‌شرط زیرِ همین خط تعریف می‌مانند — قانونِ Hookهای React
+  // اجازه نمی‌دهد این‌ها را داخل یک `if` ببریم؛ به‌جایش فقط تصمیمِ *رندر* (پایین‌ترِ همین تابع)
+  // بین فهرستِ واقعی و TransportDisabledNotice انتخاب می‌کند، دقیقاً هم‌اثر با شرطِ
+  // `if (!moduleEnabled) return <TransportDisabledNotice .../>` در transport/page.tsx وب.
+  const moduleEnabled = useTransportModuleEnabled();
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
@@ -314,6 +324,21 @@ export default function TransportScreen() {
   const vehicleLabel = (id: VehicleTypeId) => dict.transport.vehicleTypes[id];
 
   const hasMore = drivers.length < totalCount;
+
+  // 🆕 فاز M09 — تا وقتی وضعیتِ ماژول معلوم نشده، چیزی نشان نده (نه فهرست، نه اخطار) — از یک
+  // ورودِ بصریِ ناگهانی (اول فهرست، بعد جایگزینیِ ناگهانی با اخطار) جلوگیری می‌کند؛ این تاخیر
+  // در عمل نامحسوس است چون خودِ Route فقط یک select ساده از platform_settings است.
+  if (moduleEnabled === undefined) {
+    return (
+      <View style={styles.centered}>
+        <Spinner size="large" />
+      </View>
+    );
+  }
+
+  if (!moduleEnabled) {
+    return <TransportDisabledNotice dict={dict.transport.disabledNotice} />;
+  }
 
   return (
     <FlatList
